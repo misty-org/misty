@@ -192,14 +192,31 @@ fn node_json(space: &SpaceId, node: &Node, seq: i64, modified_by_name: &str) -> 
     })
 }
 
-fn folder_json(space: &SpaceId, folder: &str) -> Value {
+fn space_mtime(drive: &Drive, space: &SpaceId) -> i64 {
+    drive
+        .list(space, None)
+        .ok()
+        .and_then(|nodes| nodes.iter().map(|node| node.mtime_ms).max())
+        .filter(|mtime| *mtime > 0)
+        .unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |elapsed| elapsed.as_millis() as i64)
+        })
+}
+
+fn space_json(drive: &Drive, space: &SpaceId, folder: &str) -> Value {
+    folder_json(space, folder, space_mtime(drive, space))
+}
+
+fn folder_json(space: &SpaceId, folder: &str, mtime_ms: i64) -> Value {
     json!({
         "id": folder_id(space),
         "parent_id": null,
         "name": folder,
         "kind": "folder",
         "size": 0,
-        "mtime_ms": 0,
+        "mtime_ms": mtime_ms,
         "sha256": null,
         "version": null,
         "seq": 0,
@@ -377,7 +394,7 @@ fn changes(drive: &Drive, since: &str, limit: usize) -> Result<Value, DriveError
     for (space, folder) in drive.space_folders()? {
         let current = (drive.current_seq(&space)?, drive.current_local_seq(&space)?);
         let Some(mark) = before.iter().find(|mark| mark.space == space.0) else {
-            values.push(with_gone(folder_json(&space, &folder), false, false));
+            values.push(with_gone(space_json(drive, &space, &folder), false, false));
             marks.push(Mark {
                 space: space.0.clone(),
                 folder,
@@ -390,7 +407,7 @@ fn changes(drive: &Drive, since: &str, limit: usize) -> Result<Value, DriveError
             return Err(DriveError::AnchorExpired);
         }
         if mark.folder != folder {
-            values.push(with_gone(folder_json(&space, &folder), false, false));
+            values.push(with_gone(space_json(drive, &space, &folder), false, false));
         }
         let (items, next, more_items) = drive.changes_since(&space, Seq(mark.seq), limit)?;
         let listed: HashSet<&ItemId> = items.iter().map(|item| &item.id).collect();
@@ -414,7 +431,7 @@ fn changes(drive: &Drive, since: &str, limit: usize) -> Result<Value, DriveError
     for mark in &before {
         if !marks.iter().any(|now| now.space == mark.space) {
             let space = SpaceId(mark.space.clone());
-            values.push(with_gone(folder_json(&space, &mark.folder), false, true));
+            values.push(with_gone(folder_json(&space, &mark.folder, 0), false, true));
         }
     }
     let next_anchor = if marks == before {
@@ -471,7 +488,7 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
                 Place::Root => drive
                     .space_folders()?
                     .iter()
-                    .map(|(space, folder)| folder_json(space, folder))
+                    .map(|(space, folder)| space_json(drive, space, folder))
                     .collect(),
                 Place::Space(space) => {
                     let space = mounted(drive, space)?;
@@ -498,7 +515,7 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
                     .find(|(shown, _)| *shown == space)
                     .map(|(_, folder)| folder)
                     .ok_or(DriveError::NotFound)?;
-                Ok(json!({ "item": folder_json(&space, &folder) }))
+                Ok(json!({ "item": space_json(drive, &space, &folder) }))
             }
             Place::Item(space, id) => {
                 let space = mounted(drive, space)?;

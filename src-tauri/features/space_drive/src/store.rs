@@ -540,7 +540,7 @@ fn load(connection: &Connection) -> rusqlite::Result<Mem> {
         let mut statement = connection.prepare(&format!(
             "SELECT {NODE_COLUMNS}, local_seq FROM nodes ORDER BY ino"
         ))?;
-        let rows = statement.query_map([], |row| Ok((node_from(row)?, row.get::<_, i64>(22)?)))?;
+        let rows = statement.query_map([], |row| Ok((node_from(row)?, row.get::<_, i64>(19)?)))?;
         for row in rows {
             let (node, local) = row?;
             highest = highest.max(node.ino);

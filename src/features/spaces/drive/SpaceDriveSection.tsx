@@ -8,13 +8,6 @@ import { useDriveStatus } from "./use_drive";
 
 function DriveStatusMark({ status }: { status?: DriveSpaceStatus }) {
   if (status?.status === "syncing") return <StateMark kind="working" label="Syncing" />;
-  if (status?.status === "failed")
-    return (
-      <StateMark
-        kind="failed"
-        label={status.message ? `Couldn't sync: ${status.message}` : "Couldn't sync"}
-      />
-    );
   return null;
 }
 

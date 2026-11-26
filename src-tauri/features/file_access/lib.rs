@@ -18,7 +18,7 @@ use std::{
 };
 
 use policy::{Policy, Shape};
-pub use real_path::is_local_path;
+pub use real_path::{is_local_path, resolve as resolve_real_path};
 use tauri::{AppHandle, Manager};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,5 +1,13 @@
 import { notify } from "@misty/ui";
-import { driveNative, onDriveNotice, type DriveNotice } from "./drive_native";
+import { useSpacesStore } from "../list/use_spaces_store";
+import { spaceNavigationName } from "../routes/default_space";
+import {
+  driveNative,
+  onDriveNotice,
+  onDriveStatus,
+  type DriveNotice,
+  type DriveSpaceStatus,
+} from "./drive_native";
 
 const failed = (message: string) => () => notify({ message, tone: "error" });
 
@@ -54,15 +62,50 @@ export function driveNoticeOptions(notice: DriveNotice): Parameters<typeof notif
   }
 }
 
+const announcedFailures = new Map<string, string>();
+
+export function forgetDriveFailures() {
+  announcedFailures.clear();
+}
+
+export function announceDriveStatus(
+  next: DriveSpaceStatus | DriveSpaceStatus[],
+  retry?: () => void,
+) {
+  for (const status of Array.isArray(next) ? next : [next]) {
+    if (status.status !== "failed") {
+      announcedFailures.delete(status.space_id);
+      continue;
+    }
+    const why = status.message?.trim() ?? "";
+    if (announcedFailures.get(status.space_id) === why) continue;
+    announcedFailures.set(status.space_id, why);
+    const space = useSpacesStore.getState().spaces.find((shown) => shown.id === status.space_id);
+    const name = space ? spaceNavigationName(space) : "A Space";
+    notify({
+      id: `drive-failed:${status.space_id}`,
+      tone: "error",
+      message: why ? `${name} couldn't sync: ${why}` : `${name} couldn't sync`,
+      action: retry ? { label: "Try again", onSelect: retry } : undefined,
+    });
+  }
+}
+
 let stop: (() => void) | null = null;
 
 export function startDriveNotices(): () => void {
-  if (!stop)
-    stop = onDriveNotice((notice) => {
+  if (!stop) {
+    const stopNotices = onDriveNotice((notice) => {
       const options = driveNoticeOptions(notice);
       if (options)
         notify({ ...options, id: `drive:${notice.kind}:${notice.space_id}:${notice.name}` });
     });
+    const stopStatus = onDriveStatus((status) => announceDriveStatus(status));
+    stop = () => {
+      stopNotices();
+      stopStatus();
+    };
+  }
   return () => {
     stop?.();
     stop = null;

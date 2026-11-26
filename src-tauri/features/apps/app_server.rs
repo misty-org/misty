@@ -23,6 +23,7 @@ const PROFILE: &str = r#"
 (allow file-write* (subpath (param "DATA")) (subpath "/private/var/folders")
   (literal "/dev/null") (literal "/dev/tty") (literal "/dev/dtracehelper"))
 (deny file-read* (subpath (param "HOME")))
+(allow file-read-metadata (subpath (param "HOME")))
 (allow file-read* (subpath (param "DATA")) (subpath (param "PROGRAM_DIR")))
 (deny network-bind)
 (allow network-bind (local ip "localhost:*"))
@@ -621,7 +622,7 @@ fn confined(program: &Path, data: &Path) -> Result<tokio::process::Command, Stri
         .ok_or_else(|| failed(std::io::Error::other("")))?;
     let person = std::env::var_os("HOME")
         .map(PathBuf::from)
-        .and_then(|home| fs::canonicalize(home).ok())
+        .and_then(|home| file_access::resolve_real_path(&home).ok())
         .ok_or_else(|| failed(std::io::Error::other("")))?;
     let mut command = tokio::process::Command::new(sandbox::macos::SANDBOX_EXEC);
     command

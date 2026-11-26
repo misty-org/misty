@@ -34,6 +34,20 @@ function applyStatus(next: DriveSpaceStatus | DriveSpaceStatus[]) {
   }));
 }
 
+export function reportDriveFailure(spaceIds: string[], message: string): DriveSpaceStatus[] {
+  const failed = spaceIds.map(
+    (space_id): DriveSpaceStatus => ({
+      space_id,
+      status: "failed",
+      message,
+      pending_uploads: 0,
+      pending_downloads: 0,
+    }),
+  );
+  applyStatus(failed);
+  return failed;
+}
+
 function readStatus() {
   driveNative.status().then(
     (list) => {

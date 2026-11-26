@@ -4,6 +4,8 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { Space } from "../api/dto/entities";
 import { useSpacesStore } from "../list/use_spaces_store";
 import { driveNative, type DriveSpace } from "./drive_native";
+import { announceDriveStatus, forgetDriveFailures } from "./drive_notices";
+import { reportDriveFailure } from "./use_drive";
 
 let lastSent = "";
 let lastAccount = "";
@@ -22,8 +24,14 @@ function send(server: string, accountId: string, spaces: DriveSpace[]) {
   if (key === lastSent) return;
   lastSent = key;
   queue = queue.then(() =>
-    driveNative.syncSpaces(server, accountId, spaces).catch(() => {
+    driveNative.syncSpaces(server, accountId, spaces).catch((error: unknown) => {
       if (lastSent === key) lastSent = "";
+      const why = error instanceof Error ? error.message : String(error);
+      const failed = reportDriveFailure(
+        spaces.map((space) => space.id),
+        why,
+      );
+      announceDriveStatus(failed, retrySync);
     }),
   );
 }
@@ -43,6 +51,12 @@ function sync() {
     accountId,
     spaces.map((space) => ({ id: space.id, name: space.name })),
   );
+}
+
+function retrySync() {
+  lastSent = "";
+  forgetDriveFailures();
+  sync();
 }
 
 export function startDriveSpacesSync() {

@@ -157,6 +157,6 @@ is in `misty-sdk/docs/voice-calls.md`).
 
 **If a call won't connect**
 
-- "The call couldn't connect.": calls are off on the server, or the server can't be reached at its calls
-  hostname (`<first part>-calls.<rest of your hostname>`).
+- "The call couldn't connect.": calls are off on the server, or its LiveKit can't be reached through the API at
+  `/v1/calls`.
 - Connects but no sound or picture across networks: the UDP ports above aren't reachable from outside.
