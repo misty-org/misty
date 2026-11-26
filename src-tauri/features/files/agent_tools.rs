@@ -61,15 +61,10 @@ pub(crate) struct Refused {
     pub(crate) message: String,
 }
 
-pub(super) struct Agent {
-    pub(super) id: String,
-    pub(super) chat: Option<String>,
-}
-
 pub(crate) async fn call(
     app: &AppHandle,
-    agent_id: &str,
-    chat_id: &str,
+    _agent_id: &str,
+    _chat_id: &str,
     name: &str,
     input: Value,
 ) -> Result<Value, Refused> {
@@ -84,18 +79,13 @@ opening Files. Nothing was done."
     if name == DELETE && !permissions::agent_delete_on(app) {
         return Err(Refused {
             code: "delete_off",
-            message:
-                "Agents don't delete files. Move it to the trash with files.trash instead. \
+            message: "Agents don't delete files. Move it to the trash with files.trash instead. \
 Nothing was deleted."
-                    .to_owned(),
+                .to_owned(),
         });
     }
-    let agent = Agent {
-        id: agent_id.to_owned(),
-        chat: Some(chat_id.to_owned()).filter(|chat| !chat.is_empty()),
-    };
     let (app, name) = (app.clone(), name.to_owned());
-    tokio::task::spawn_blocking(move || run(&app, &agent, &name, &input))
+    tokio::task::spawn_blocking(move || run(&app, &name, &input))
         .await
         .map_err(|error| Refused {
             code: "files_failed",
@@ -107,7 +97,7 @@ Nothing was deleted."
         })
 }
 
-fn run(app: &AppHandle, agent: &Agent, name: &str, input: &Value) -> Result<Value, String> {
+fn run(app: &AppHandle, name: &str, input: &Value) -> Result<Value, String> {
     match name {
         "files.list" => list(input),
         "files.search" => search(input),
@@ -118,7 +108,7 @@ fn run(app: &AppHandle, agent: &Agent, name: &str, input: &Value) -> Result<Valu
         "files.rename" => changes::rename(input),
         "files.move" => changes::transfer(input, false),
         "files.copy" => changes::transfer(input, true),
-        "files.trash" => changes::trash(app, agent, input),
+        "files.trash" => changes::trash(app, input),
         "files.tag" => changes::tag(input),
         "files.zip" => archive::zip(input),
         "files.extract" => archive::extract(input),

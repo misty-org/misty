@@ -61,7 +61,9 @@ export function tidyTabGroups(layout: WorkspaceLayout): WorkspaceLayout {
   const active = ordered.find((tab) => tab.id === layout.activeTabId)?.group;
   const kept = groups
     .filter((group) => placed.has(group.id))
-    .map((group) => (group.id === active && group.collapsed ? { ...group, collapsed: false } : group));
+    .map((group) =>
+      group.id === active && group.collapsed ? { ...group, collapsed: false } : group,
+    );
   const sameTabs =
     layout.tabs?.length === ordered.length &&
     ordered.every((tab, index) => tab === layout.tabs![index]);
@@ -100,11 +102,7 @@ function newGroup(layout: WorkspaceLayout): WorkspaceTabGroup {
   };
 }
 
-function placeTab(
-  tabs: WorkspaceTab[],
-  tab: WorkspaceTab,
-  index: number,
-): WorkspaceTab[] {
+function placeTab(tabs: WorkspaceTab[], tab: WorkspaceTab, index: number): WorkspaceTab[] {
   const rest = tabs.filter((other) => other.id !== tab.id);
   const at = Math.max(0, Math.min(index, rest.length));
   return [...rest.slice(0, at), tab, ...rest.slice(at)];
@@ -136,10 +134,11 @@ export function groupTabs(layout: WorkspaceLayout, tabIds: string[]): WorkspaceL
   const rest = tabs.filter((tab) => !tabIds.includes(tab.id));
   const at = rest.filter((tab) => tabs.indexOf(tab) < first).length;
   const moved = picked.map((tab) => ({ ...tab, group: group.id }));
-  return withTabs(layout, [...rest.slice(0, at), ...moved, ...rest.slice(at)], [
-    ...tabGroups(layout),
-    group,
-  ]);
+  return withTabs(
+    layout,
+    [...rest.slice(0, at), ...moved, ...rest.slice(at)],
+    [...tabGroups(layout), group],
+  );
 }
 
 export function groupTabWith(
@@ -272,14 +271,12 @@ export function separateTab(layout: WorkspaceLayout, tabId: string): WorkspaceLa
   if (panes.length < 2) return layout;
   const group = tab.group ? undefined : newGroup(layout);
   const groupId = tab.group ?? group!.id;
-  const separated = panes.map(
-    (pane, index): WorkspaceTab => ({
-      id: index === 0 ? tab.id : `layout:${dockTreeViews(pane)[0]?.id ?? pane.id}`,
-      root: pane,
-      focusedPaneId: pane.id,
-      group: groupId,
-    }),
-  );
+  const separated = panes.map((pane, index): WorkspaceTab => ({
+    id: index === 0 ? tab.id : `layout:${dockTreeViews(pane)[0]?.id ?? pane.id}`,
+    root: pane,
+    focusedPaneId: pane.id,
+    group: groupId,
+  }));
   const at = tabs.indexOf(tab);
   const next = [...tabs.slice(0, at), ...separated, ...tabs.slice(at + 1)];
   return withTabs(layout, next, group ? [...tabGroups(layout), group] : tabGroups(layout));

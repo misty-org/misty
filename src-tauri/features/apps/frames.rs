@@ -133,7 +133,10 @@ pub fn app_of(mount: &str) -> Option<String> {
 }
 
 pub fn document_left(app: &AppHandle, mount: &str) {
-    if with_mount(mount, |entry| entry.doc.take()).flatten().is_some() {
+    if with_mount(mount, |entry| entry.doc.take())
+        .flatten()
+        .is_some()
+    {
         emit_page(app, mount, "opened", None);
     }
 }

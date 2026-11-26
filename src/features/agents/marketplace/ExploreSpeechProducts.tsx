@@ -1,12 +1,7 @@
 import { ExternalLink, Mic, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import {
-  chooseHearing,
-  listen,
-  type HearingModelView,
-  type Listening,
-} from "@/features/voice";
+import { chooseHearing, listen, type HearingModelView, type Listening } from "@/features/voice";
 import { openExternalLink } from "@/shared/platform/open_external_link";
 
 import {
@@ -198,4 +193,3 @@ function HearingManage({ model }: { model: HearingModelView }) {
     </>
   );
 }
-

@@ -50,8 +50,7 @@ export function followWebDownloads() {
   });
 }
 
-export const openDownload = (id: string) =>
-  invoke("browser_download_open", { request: { id } });
+export const openDownload = (id: string) => invoke("browser_download_open", { request: { id } });
 
 export async function clearDownloads() {
   await invoke("browser_downloads_clear").catch(() => undefined);

@@ -229,9 +229,7 @@ it("offers only the direct sign-ins, which need no key, then ends the welcome", 
     expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
   );
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  expect(
-    await screen.findByRole("heading", { name: "Which language do you speak?" }),
-  ).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: "Which language do you speak?" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(await screen.findByRole("button", { name: "Connect Notion" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Connect Asana" })).toBeNull();

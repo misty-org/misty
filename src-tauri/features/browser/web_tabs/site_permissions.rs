@@ -1,3 +1,4 @@
+#[cfg(target_os = "macos")]
 use super::app;
 use crate::app::runtime::MistyRuntime;
 use crate::browser::*;
@@ -63,6 +64,7 @@ fn write_all(app: &AppHandle, document: &Map<String, Value>) -> Result<(), Strin
         .map_err(|error| error.to_string())
 }
 
+#[cfg(target_os = "macos")]
 fn decided(app: &AppHandle, origin: &str, kinds: &[&'static str]) -> Option<bool> {
     let all = read_all(app);
     let choices = all.get(origin)?.as_object()?;
@@ -77,7 +79,12 @@ fn decided(app: &AppHandle, origin: &str, kinds: &[&'static str]) -> Option<bool
     allowed.then_some(true)
 }
 
-fn set_choice(app: &AppHandle, origin: &str, kinds: &[&str], allow: Option<bool>) -> Result<(), String> {
+fn set_choice(
+    app: &AppHandle,
+    origin: &str,
+    kinds: &[&str],
+    allow: Option<bool>,
+) -> Result<(), String> {
     let mut all = read_all(app);
     let entry = all
         .entry(origin.to_owned())
@@ -108,6 +115,7 @@ fn web_origin(origin: &str) -> Result<String, String> {
     Ok(url.origin().ascii_serialization())
 }
 
+#[cfg(target_os = "macos")]
 pub(super) fn ask(page: &str, origin: String, kinds: Vec<&'static str>, answer: Answer) {
     let Some(app) = app() else {
         return answer(false);

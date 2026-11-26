@@ -94,9 +94,17 @@ pub(super) async fn install_skill_from(
     let (branch, tree, source_dir, unpacked) = match (&local, &bundle) {
         (Some(folder), _) => {
             if !file_access::fs::is_file(folder.join("SKILL.md")) {
-                return Err(SkillError::coded("invalid_input", "The folder holds no SKILL.md"));
+                return Err(SkillError::coded(
+                    "invalid_input",
+                    "The folder holds no SKILL.md",
+                ));
             }
-            (repo_branch.clone(), Vec::new(), source_dir, Some(folder.clone()))
+            (
+                repo_branch.clone(),
+                Vec::new(),
+                source_dir,
+                Some(folder.clone()),
+            )
         }
         (None, Some(bundle)) => {
             let folder = crate::registry::bundles::unpacked(bundle)
@@ -151,7 +159,11 @@ pub(super) async fn install_skill_from(
         if let Some(folder) = &unpacked {
             copy_dir(folder, &temp)?;
         }
-        let client = if files.is_empty() { None } else { Some(http_client()?) };
+        let client = if files.is_empty() {
+            None
+        } else {
+            Some(http_client()?)
+        };
         for entry in &files {
             let Some(client) = client.as_ref() else {
                 break;

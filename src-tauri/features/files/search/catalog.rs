@@ -73,7 +73,7 @@ impl From<&Doc> for Signature {
 }
 
 pub(super) struct Catalog {
-    pub index: Index,
+    pub _index: Index,
     pub fields: Fields,
     pub reader: IndexReader,
     pub manifest: Connection,
@@ -171,7 +171,7 @@ pub(super) fn open(root: &Path) -> Result<Catalog, String> {
         .writer_with_num_threads(1, WRITER_BUDGET)
         .map_err(index_error)?;
     Ok(Catalog {
-        index,
+        _index: index,
         fields,
         reader,
         manifest,

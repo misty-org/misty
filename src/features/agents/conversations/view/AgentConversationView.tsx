@@ -99,7 +99,9 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
         ) ? (
           <AgentThinkingRow
             agent={props.agent}
-            since={[...props.conversation.messages].reverse().find((m) => m.role === "user")?.createdAt}
+            since={
+              [...props.conversation.messages].reverse().find((m) => m.role === "user")?.createdAt
+            }
           />
         ) : null}
       </div>

@@ -7,7 +7,7 @@ use file_access::{
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
-use super::{all_failed, failure, path_list, text, Agent};
+use super::{all_failed, failure, path_list, text};
 use crate::files::{
     agent_paths::{admit, admit_path},
     agent_trash::{move_to_trash_for_agent, Landed},
@@ -156,7 +156,7 @@ pub(super) fn transfer(input: &Value, copy: bool) -> Result<Value, String> {
     Ok(result)
 }
 
-pub(super) fn trash(app: &AppHandle, _agent: &Agent, input: &Value) -> Result<Value, String> {
+pub(super) fn trash(app: &AppHandle, input: &Value) -> Result<Value, String> {
     let paths = path_list(input, "paths")?;
     let (mut done, mut failures) = (Vec::new(), Vec::new());
     for asked in &paths {

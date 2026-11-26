@@ -58,6 +58,7 @@ interface Question {
 }
 
 const REFUSAL_NOTICES = 3;
+const APP_START_STALL_MS = 60_000;
 
 function outsideAddress(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -305,23 +306,23 @@ export function AppPageStage({
     );
   };
 
-  if (failed)
-    return (
-      <SetupState
-        tool={appName}
-        error={failed}
-        onRetry={() => {
-          setFailed(null);
-          setOpened(false);
-          setPresented(false);
-          setMount(newMount(appId));
-        }}
-      />
-    );
+  const reopen = () => {
+    setFailed(null);
+    setOpened(false);
+    setPresented(false);
+    setMount(newMount(appId));
+  };
+
+  if (failed) return <SetupState tool={appName} error={failed} onRetry={reopen} />;
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <PageStage hostRef={host} placed={opened} presented={presented}>
-        <SetupState tool={appName} label={`Setting up ${appName}`} stallAfterMs={false} />
+        <SetupState
+          tool={appName}
+          label={`Setting up ${appName}`}
+          stallAfterMs={APP_START_STALL_MS}
+          onRetry={reopen}
+        />
       </PageStage>
       {lowered && presented ? (
         <Pressable

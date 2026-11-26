@@ -7,8 +7,8 @@ use serde_json::{json, Value};
 
 use super::files::{self, display_path};
 use super::{misty, row, turn, Command, Context, Output, Row, Section};
-use crate::engines::gemini as adapter;
 use crate::engines::acp_session::{self as acp, AcpLine};
+use crate::engines::gemini as adapter;
 
 mod chat;
 mod cli;

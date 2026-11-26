@@ -4,6 +4,7 @@ use base64::Engine as _;
 use serde_json::json;
 use serde_json::Value;
 
+#[cfg(any(target_os = "macos", test))]
 fn png_size(bytes: &[u8]) -> Option<(u32, u32)> {
     if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
         return None;

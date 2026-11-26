@@ -127,9 +127,7 @@ export function SetupPage() {
       <div hidden={step !== "engines"}>
         <EnginesStep onState={onState} chosen={chosen} onChoose={setPicked} unfit={unfit} />
       </div>
-      {step === "voice" ? (
-        <VoiceStep language={language} onLanguage={setLanguage} />
-      ) : null}
+      {step === "voice" ? <VoiceStep language={language} onLanguage={setLanguage} /> : null}
       {step === "apps" ? <AppsStep /> : null}
     </StepPage>
   );

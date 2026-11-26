@@ -88,7 +88,8 @@ pub async fn unpacked(file: &RegistryFile) -> Result<PathBuf, String> {
 }
 
 pub fn read_inside(folder: &Path, path: &str, most: u64) -> Result<String, String> {
-    let relative = inside(Path::new(path)).ok_or_else(|| "That file isn't in the bundle.".to_string())?;
+    let relative =
+        inside(Path::new(path)).ok_or_else(|| "That file isn't in the bundle.".to_string())?;
     let file = folder.join(relative);
     let size = file_access::fs::metadata(&file)
         .map_err(|_| "That file isn't in the bundle.".to_string())?
@@ -107,6 +108,9 @@ mod tests {
     fn a_bundle_never_writes_outside_its_folder() {
         assert!(inside(Path::new("../etc/passwd")).is_none());
         assert!(inside(Path::new("/etc/passwd")).is_none());
-        assert_eq!(inside(Path::new("./skills/a/SKILL.md")), Some(PathBuf::from("skills/a/SKILL.md")));
+        assert_eq!(
+            inside(Path::new("./skills/a/SKILL.md")),
+            Some(PathBuf::from("skills/a/SKILL.md"))
+        );
     }
 }

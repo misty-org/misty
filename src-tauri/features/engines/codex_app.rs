@@ -79,8 +79,7 @@ mod sandbox;
 use native::{native_command, started_turn_id, NativeCommand};
 use plan::{
     check_plan_item, collaboration_mode, decision_collaboration, decision_spec, plan_collaboration,
-    plan_id_for,
-    plan_title, PLAN_STALE_PREFIX,
+    plan_id_for, plan_title, PLAN_STALE_PREFIX,
 };
 use sandbox::{sandbox_for, writable_roots};
 

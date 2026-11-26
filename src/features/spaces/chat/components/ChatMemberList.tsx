@@ -149,19 +149,7 @@ export function ChatMemberList(props: {
     rest = take("Online", (item) => item.presence !== "offline", rest);
     take("Offline", () => true, rest);
     return out;
-  }, [
-    heard,
-    people,
-    mine,
-    now,
-    props,
-    roles,
-    spaceId,
-    viewers,
-    accounts,
-    voice,
-    conversations,
-  ]);
+  }, [heard, people, mine, now, props, roles, spaceId, viewers, accounts, voice, conversations]);
 
   if (!people && failed)
     return (

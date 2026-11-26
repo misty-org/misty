@@ -21,16 +21,7 @@ pub(crate) const LEGACY_LOCAL_CONFIG_TOML_ID: &str = "__local_config_toml__";
 pub const DISABLED_PROVIDER_ID: &str = "__disabled__";
 
 pub const ENGINES: [&str; 11] = [
-    "claude",
-    "codex",
-    "gemini",
-    "qwen",
-    "kimi",
-    "grok",
-    "minimax",
-    "qoder",
-    "qoder-cn",
-    "agy",
+    "claude", "codex", "gemini", "qwen", "kimi", "grok", "minimax", "qoder", "qoder-cn", "agy",
     "hermes",
 ];
 

@@ -14,10 +14,7 @@ import type { SpaceEvent } from "../api/dto/entities";
 const maxAgents = 3;
 const rememberedLimit = 500;
 const ranMessages = new Set<string>();
-const awaitingEcho = new Map<
-  string,
-  { agents: readonly MentionableAgent[]; senderId: string }
->();
+const awaitingEcho = new Map<string, { agents: readonly MentionableAgent[]; senderId: string }>();
 
 function remember<T>(store: Set<T> | Map<T, unknown>, limit: number) {
   if (store.size <= limit) return;

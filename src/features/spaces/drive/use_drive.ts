@@ -35,15 +35,13 @@ function applyStatus(next: DriveSpaceStatus | DriveSpaceStatus[]) {
 }
 
 export function reportDriveFailure(spaceIds: string[], message: string): DriveSpaceStatus[] {
-  const failed = spaceIds.map(
-    (space_id): DriveSpaceStatus => ({
-      space_id,
-      status: "failed",
-      message,
-      pending_uploads: 0,
-      pending_downloads: 0,
-    }),
-  );
+  const failed = spaceIds.map((space_id): DriveSpaceStatus => ({
+    space_id,
+    status: "failed",
+    message,
+    pending_uploads: 0,
+    pending_downloads: 0,
+  }));
   applyStatus(failed);
   return failed;
 }
@@ -200,4 +198,3 @@ export function useDriveList(spaceId: string | undefined, path: string) {
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
   return { ...state, retry };
 }
-

@@ -63,21 +63,18 @@ pub(crate) async fn css_viewport(view: &Webview) -> Result<(f64, f64), CdpError>
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum MouseButton {
     Left,
-    Right,
 }
 
 impl MouseButton {
     fn name(self) -> &'static str {
         match self {
             Self::Left => "left",
-            Self::Right => "right",
         }
     }
 
     fn held(self) -> u8 {
         match self {
             Self::Left => 1,
-            Self::Right => 2,
         }
     }
 }

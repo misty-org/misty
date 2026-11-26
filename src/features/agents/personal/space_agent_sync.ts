@@ -89,7 +89,11 @@ export async function publishAgent(
       listed ?? (await spaceAgentsApi.list(spaceId).catch(() => ({ agents: [] }))).agents
     ).find((agent) => agent.space_id === spaceId && agent.agent_id === current.agent.id);
     if (there && !there.revision && there.owner_user_id === account) oldListing = there.agent_id;
-    const moved = await rekey(account, current, await copyIdFor(account, current.agent.id, spaceId));
+    const moved = await rekey(
+      account,
+      current,
+      await copyIdFor(account, current.agent.id, spaceId),
+    );
     if (!moved) return current.agent;
     current = moved;
   }
@@ -229,10 +233,7 @@ const syncing = new Map<string, Promise<AgentProfile[] | null>>();
 
 function ready(account: string) {
   return (
-    Boolean(account) &&
-    isSignedIn() &&
-    account === agentAccountId() &&
-    Boolean(ownSpaceOf(account))
+    Boolean(account) && isSignedIn() && account === agentAccountId() && Boolean(ownSpaceOf(account))
   );
 }
 
@@ -255,7 +256,10 @@ export function syncSpaceAgents(account: string): Promise<AgentProfile[] | null>
 
 const refreshing = new Map<string, { again: boolean; work: Promise<AgentProfile[] | null> }>();
 
-export function refreshSpaceAgents(account: string, spaceId: string): Promise<AgentProfile[] | null> {
+export function refreshSpaceAgents(
+  account: string,
+  spaceId: string,
+): Promise<AgentProfile[] | null> {
   const key = `${account}\u0000${spaceId}`;
   const running = refreshing.get(key);
   if (running) {
@@ -283,7 +287,10 @@ export function refreshSpaceAgents(account: string, spaceId: string): Promise<Ag
   return entry.work;
 }
 
-export async function copyAgentToSpace(agent: AgentProfile, spaceId: string): Promise<AgentProfile> {
+export async function copyAgentToSpace(
+  agent: AgentProfile,
+  spaceId: string,
+): Promise<AgentProfile> {
   const account = agentAccountId();
   const saved = await spaceAgentsApi.put(spaceId, freshAgentId(), {
     ...definitionOf(agent),

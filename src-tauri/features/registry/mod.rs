@@ -33,8 +33,10 @@ const SCHEMA: u64 = 3;
 const LISTINGS: &[&str] = &["plugins", "skills", "templates", "mcps"];
 const SECTIONS: &[&str] = &["categories", "apps", "engines", "speech", "ignore"];
 
-pub const REGISTRY_KEYS: &[(&str, &str)] =
-    &[("misty-registry-2", "VJ+xEM4XzgU5TO8sQNvKp6uAr082gCWUFksnpZ4zH2M=")];
+pub const REGISTRY_KEYS: &[(&str, &str)] = &[(
+    "misty-registry-2",
+    "VJ+xEM4XzgU5TO8sQNvKp6uAr082gCWUFksnpZ4zH2M=",
+)];
 
 pub const CHANGED_EVENT: &str = "misty://registry-changed";
 
@@ -244,7 +246,10 @@ async fn fetch(client: &reqwest::Client, path: &str, most: usize) -> Result<Vec<
         .await
         .and_then(|response| response.error_for_status())
         .map_err(|error| error.to_string())?;
-    if response.content_length().is_some_and(|length| length > most as u64) {
+    if response
+        .content_length()
+        .is_some_and(|length| length > most as u64)
+    {
         return Err("a registry file is larger than it may be".into());
     }
     let bytes = response.bytes().await.map_err(|error| error.to_string())?;
@@ -356,7 +361,10 @@ fn named_shards(document: &Value) -> Vec<String> {
         .map(|shard| shard.sha256)
         .collect();
     for kind in LISTINGS {
-        let Some(listing) = document.get("listings").and_then(|listings| listings.get(kind)) else {
+        let Some(listing) = document
+            .get("listings")
+            .and_then(|listings| listings.get(kind))
+        else {
             continue;
         };
         if let Some(sha) = listing.pointer("/top/sha256").and_then(Value::as_str) {
@@ -447,8 +455,11 @@ async fn shard_text(app: &AppHandle, shard: &ShardRef) -> Result<String, String>
     let client = crate::engine_config::support::http_client()?;
     let bytes = fetch(&client, &shard.path, MAX_SHARD_BYTES as usize)
         .await
-        .map_err(|_| "Couldn't reach Misty's registry. Check your connection and try again.".to_string())?;
-    let text = String::from_utf8(bytes).map_err(|_| "A registry listing isn't text.".to_string())?;
+        .map_err(|_| {
+            "Couldn't reach Misty's registry. Check your connection and try again.".to_string()
+        })?;
+    let text =
+        String::from_utf8(bytes).map_err(|_| "A registry listing isn't text.".to_string())?;
     if !fits(shard, &text) {
         return Err("A registry listing doesn't match its checksum.".into());
     }
@@ -512,11 +523,16 @@ static PARSED: LazyLock<std::sync::Mutex<HashMap<String, Arc<Vec<Value>>>>> =
 type ShardLoad = Result<Arc<Vec<Value>>, String>;
 
 async fn shard_items(app: &AppHandle, shard: &ShardRef) -> Result<Arc<Vec<Value>>, String> {
-    if let Some(items) = PARSED.lock().ok().and_then(|held| held.get(&shard.sha256).cloned()) {
+    if let Some(items) = PARSED
+        .lock()
+        .ok()
+        .and_then(|held| held.get(&shard.sha256).cloned())
+    {
         return Ok(items);
     }
     let text = shard_text(app, shard).await?;
-    let body: Value = serde_json::from_str(&text).map_err(|_| "A registry listing isn't JSON.".to_string())?;
+    let body: Value =
+        serde_json::from_str(&text).map_err(|_| "A registry listing isn't JSON.".to_string())?;
     let items = Arc::new(
         body.get("items")
             .and_then(Value::as_array)
@@ -530,8 +546,18 @@ async fn shard_items(app: &AppHandle, shard: &ShardRef) -> Result<Arc<Vec<Value>
 }
 
 fn hit(item: &Value, words: &[String]) -> bool {
-    let field = |key: &str| item.get(key).and_then(Value::as_str).unwrap_or("").to_lowercase();
-    let text = format!("{} {} {}", field("name"), field("description"), field("maker"));
+    let field = |key: &str| {
+        item.get(key)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_lowercase()
+    };
+    let text = format!(
+        "{} {} {}",
+        field("name"),
+        field("description"),
+        field("maker")
+    );
     words.iter().all(|word| text.contains(word.as_str()))
 }
 
@@ -575,7 +601,9 @@ pub async fn registry_search(
                     .map(|categories| {
                         categories
                             .values()
-                            .filter_map(|entry| serde_json::from_value::<ShardRef>(entry.clone()).ok())
+                            .filter_map(|entry| {
+                                serde_json::from_value::<ShardRef>(entry.clone()).ok()
+                            })
                             .map(|shard| (listing.clone(), shard))
                             .collect::<Vec<_>>()
                     })
@@ -583,23 +611,34 @@ pub async fn registry_search(
             })
             .collect()
     };
-    let loaded: Vec<(String, ShardLoad)> = futures_util::stream::iter(jobs.into_iter().map(|(listing, shard)| {
-        let app = app.clone();
-        async move { (listing, shard_items(&app, &shard).await) }
-    }))
-    .buffer_unordered(8)
-    .collect()
-    .await;
-    let mut hits: HashMap<String, Vec<Value>> = wanted.iter().map(|listing| (listing.clone(), Vec::new())).collect();
+    let loaded: Vec<(String, ShardLoad)> =
+        futures_util::stream::iter(jobs.into_iter().map(|(listing, shard)| {
+            let app = app.clone();
+            async move { (listing, shard_items(&app, &shard).await) }
+        }))
+        .buffer_unordered(8)
+        .collect()
+        .await;
+    let mut hits: HashMap<String, Vec<Value>> = wanted
+        .iter()
+        .map(|listing| (listing.clone(), Vec::new()))
+        .collect();
     for (listing, items) in loaded {
         let items = items?;
-        hits.entry(listing).or_default().extend(items.iter().filter(|item| hit(item, &words)).cloned());
+        hits.entry(listing)
+            .or_default()
+            .extend(items.iter().filter(|item| hit(item, &words)).cloned());
     }
     let mut found = HashMap::new();
     for (listing, mut hits) in hits {
         hits.sort_by(|a, b| {
             rank(b).cmp(&rank(a)).then_with(|| {
-                let name = |item: &Value| item.get("name").and_then(Value::as_str).unwrap_or("").to_string();
+                let name = |item: &Value| {
+                    item.get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string()
+                };
                 name(a).cmp(&name(b))
             })
         });
@@ -611,7 +650,11 @@ pub async fn registry_search(
 }
 
 #[tauri::command]
-pub async fn registry_find(app: AppHandle, kind: String, ids: Vec<String>) -> Result<Vec<Value>, String> {
+pub async fn registry_find(
+    app: AppHandle,
+    kind: String,
+    ids: Vec<String>,
+) -> Result<Vec<Value>, String> {
     if !LISTINGS.contains(&kind.as_str()) {
         return Err("The registry lists no such kind.".into());
     }
@@ -633,7 +676,11 @@ pub async fn registry_find(app: AppHandle, kind: String, ids: Vec<String>) -> Re
         found.extend(
             items
                 .iter()
-                .filter(|item| item.get("id").and_then(Value::as_str).is_some_and(|id| wanted.contains(id)))
+                .filter(|item| {
+                    item.get("id")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| wanted.contains(id))
+                })
                 .cloned(),
         );
         if found.len() == wanted.len() {
@@ -661,14 +708,20 @@ fn pinned_file_url(repo: &str, commit: &str, path: &str) -> Option<String> {
     let pinned = commit.len() == 40 && commit.bytes().all(|byte| byte.is_ascii_hexdigit());
     let inside = !path.is_empty()
         && !path.starts_with('/')
-        && path.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+        && path
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
         && !path.contains(['\\', '?', '#', '%']);
     (named(owner) && named(name) && pinned && inside)
         .then(|| format!("https://raw.githubusercontent.com/{owner}/{name}/{commit}/{path}"))
 }
 
 #[tauri::command]
-pub async fn registry_source_file(repo: String, commit: String, path: String) -> Result<String, String> {
+pub async fn registry_source_file(
+    repo: String,
+    commit: String,
+    path: String,
+) -> Result<String, String> {
     let url = pinned_file_url(&repo, &commit, &path)
         .ok_or_else(|| "The registry names a file Misty won't read.".to_string())?;
     let client = crate::engine_config::support::http_client()?;
@@ -732,7 +785,11 @@ mod tests {
     #[test]
     fn search_matches_every_word_in_any_field() {
         let item = serde_json::json!({ "name": "PDF tools", "description": "Merge files", "maker": "Ana", "rank": 5 });
-        let words = |text: &str| text.split_whitespace().map(str::to_string).collect::<Vec<_>>();
+        let words = |text: &str| {
+            text.split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
         assert!(hit(&item, &words("pdf merge ana")));
         assert!(!hit(&item, &words("pdf video")));
         assert_eq!(rank(&item), 5);
@@ -752,23 +809,45 @@ mod tests {
     async fn the_published_index_verifies_and_every_shard_it_names_is_there() {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let client = reqwest::Client::new();
-        let root = fetch(&client, ROOT, MAX_ROOT_BYTES).await.expect("the root is published");
-        let signature = fetch(&client, SIGNATURE, 4096).await.expect("its signature is published");
-        let document = verified(&root, &String::from_utf8(signature).unwrap(), REGISTRY_KEYS).expect("a key Misty carries signed it");
-        assert!(usable(&document), "the published root is schema {SCHEMA} with a publish time");
+        let root = fetch(&client, ROOT, MAX_ROOT_BYTES)
+            .await
+            .expect("the root is published");
+        let signature = fetch(&client, SIGNATURE, 4096)
+            .await
+            .expect("its signature is published");
+        let document = verified(&root, &String::from_utf8(signature).unwrap(), REGISTRY_KEYS)
+            .expect("a key Misty carries signed it");
+        assert!(
+            usable(&document),
+            "the published root is schema {SCHEMA} with a publish time"
+        );
         let mut shards = section_refs(&document).expect("it names every section");
         for kind in LISTINGS {
             let listing = &document["listings"][kind];
             shards.push(serde_json::from_value(listing["top"].clone()).expect("a top shard"));
-            for one in listing["categories"].as_object().expect("its categories").values() {
+            for one in listing["categories"]
+                .as_object()
+                .expect("its categories")
+                .values()
+            {
                 shards.push(serde_json::from_value(one.clone()).expect("a category shard"));
             }
         }
         for shard in &shards {
-            let bytes = fetch(&client, &shard.path, MAX_SHARD_BYTES as usize).await.expect("the shard is there");
-            assert!(fits(shard, &String::from_utf8(bytes).unwrap()), "{} matches its checksum", shard.path);
+            let bytes = fetch(&client, &shard.path, MAX_SHARD_BYTES as usize)
+                .await
+                .expect("the shard is there");
+            assert!(
+                fits(shard, &String::from_utf8(bytes).unwrap()),
+                "{} matches its checksum",
+                shard.path
+            );
         }
-        eprintln!("published {} verified, {} shards match", document["published_at"], shards.len());
+        eprintln!(
+            "published {} verified, {} shards match",
+            document["published_at"],
+            shards.len()
+        );
     }
 
     #[test]

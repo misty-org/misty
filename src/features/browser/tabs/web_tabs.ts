@@ -237,7 +237,9 @@ export function wakeWebTab(
       if (page && (await adoptSparePage(page, id, current.scopeId, url, spaceId, host)))
         return true;
       const viewId = `page-${crypto.randomUUID()}`;
-      if (!(await openPage(viewId, current.scopeId, url, spaceId, shownPageBox(host), host ?? null)))
+      if (
+        !(await openPage(viewId, current.scopeId, url, spaceId, shownPageBox(host), host ?? null))
+      )
         return false;
       updateWebTab(id, { viewId, spaceId, zoom: 1 });
       return true;

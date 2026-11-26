@@ -212,7 +212,8 @@ onRealtimeMessage("voice.full", (message) => {
   for (const pending of waiting) pending.full?.();
   if (waiting.length) return;
   const place = isVoice(useCallStore.getState().active);
-  if (!place || place.spaceId !== message.space_id || place.channelId !== message.channel_id) return;
+  if (!place || place.spaceId !== message.space_id || place.channelId !== message.channel_id)
+    return;
   if (useCallStore.getState().active?.state === "live") return;
   useCallStore.getState().leave();
   notify({ message: "This channel is full, so you left it." });

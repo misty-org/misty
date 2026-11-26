@@ -1,13 +1,5 @@
 import { Check, SendHorizontal } from "lucide-react";
-import {
-  Button,
-  ColorChip,
-  OverflowFadeText,
-  Separator,
-  Surface,
-  Text,
-  Tooltip,
-} from "@misty/ui";
+import { Button, ColorChip, OverflowFadeText, Separator, Surface, Text, Tooltip } from "@misty/ui";
 import { sizeLabel, styleNames } from "./picked_element";
 import type { PagePick } from "./pick_api";
 

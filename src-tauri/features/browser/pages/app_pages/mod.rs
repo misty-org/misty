@@ -278,6 +278,11 @@ pub async fn space_app_page_open(
             frames::document_left(webview.app_handle(), &load_mount)
         }
         tauri::webview::PageLoadEvent::Finished => {
+            #[cfg(target_os = "macos")]
+            {
+                crate::browser::pages::first_paint::note_page_background(&webview, true);
+                crate::browser::pages::first_paint::note_page_finished(&webview);
+            }
             if let Some(state) = webview.app_handle().try_state::<BrowserSessionState>() {
                 let _ = crate::browser::input::shortcuts::apply(&webview, &state);
             }
@@ -302,6 +307,8 @@ pub async fn space_app_page_open(
             return Err(error.to_string());
         }
     };
+    #[cfg(target_os = "macos")]
+    crate::browser::pages::first_paint::clear_canvas_until_drawn(&page);
     crate::browser::kiri_link::host_messages::install(&page)?;
     permissions::install(&app, &page, &mount)?;
     crate::browser::page_media::install(&page)?;

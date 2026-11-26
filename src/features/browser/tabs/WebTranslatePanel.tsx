@@ -10,7 +10,11 @@ export interface WebPageText {
 }
 
 export interface WebTranslator {
-  translate(page: WebPageText, onText: (text: string) => void, signal: AbortSignal): Promise<string>;
+  translate(
+    page: WebPageText,
+    onText: (text: string) => void,
+    signal: AbortSignal,
+  ): Promise<string>;
   render(text: string, streaming: boolean): ReactNode;
 }
 

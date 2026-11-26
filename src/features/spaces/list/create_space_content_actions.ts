@@ -97,7 +97,8 @@ export function createSpaceContentActions(
         error: null,
       });
       try {
-        const spans = content ?? buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? []);
+        const spans =
+          content ?? buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? []);
         const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
         set((state) => ({
           messagesBySpace: {

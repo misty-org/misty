@@ -128,7 +128,9 @@ fn engines_without_a_status_command_remember_a_sign_in() {
         assert!(remembers_sign_in(engine), "{engine}");
         assert!(remembered_sign_in(engine).is_some_and(|(signed_in, _)| signed_in.is_some()));
     }
-    for engine in ["claude", "codex", "gemini", "qwen", "grok", "qoder", "qoder-cn"] {
+    for engine in [
+        "claude", "codex", "gemini", "qwen", "grok", "qoder", "qoder-cn",
+    ] {
         assert!(!remembers_sign_in(engine), "{engine}");
     }
     for engine in ["claude", "codex", "gemini", "qwen"] {

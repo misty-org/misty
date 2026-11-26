@@ -67,8 +67,7 @@ export function SpaceAppFrame({
         }}
       />
     );
-  if (app.status === "setup")
-    return <SetupState tool={appName} named stallAfterMs={false} />;
+  if (app.status === "setup") return <SetupState tool={appName} named stallAfterMs={false} />;
   return (
     <AppPageStage
       key={`${appId}@${version}`}

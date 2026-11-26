@@ -63,10 +63,7 @@ pub(super) async fn hermes_btw(
     ))
 }
 
-fn cli_command(
-    engine: &str,
-    folder: &Path,
-) -> Result<(tokio::process::Command, String), String> {
+fn cli_command(engine: &str, folder: &Path) -> Result<(tokio::process::Command, String), String> {
     crate::engines::support::config::ensure_engine_enabled(engine)?;
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = crate::engines::engine_bin(&settings, engine);

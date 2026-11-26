@@ -125,7 +125,12 @@ pub fn usable() -> bool {
 
 fn language_of(language: Option<&str>) -> String {
     language
-        .map(|code| code.split(['-', '_']).next().unwrap_or(code).to_ascii_lowercase())
+        .map(|code| {
+            code.split(['-', '_'])
+                .next()
+                .unwrap_or(code)
+                .to_ascii_lowercase()
+        })
         .filter(|code| LANGUAGES.contains(&code.as_str()))
         .unwrap_or_else(|| "en".to_owned())
 }
@@ -133,7 +138,13 @@ fn language_of(language: Option<&str>) -> String {
 fn key_of(voice_id: &str) -> String {
     let slug: String = voice_id
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect();
     format!("{KEY_PREFIX}{slug}")
 }
@@ -181,7 +192,12 @@ pub async fn voices(app: &AppHandle) -> Result<Vec<VoiceOption>, String> {
 
 async fn preset_id(url: &str, key: &str) -> Result<String, String> {
     preset_of(key)?;
-    let known = |key: &str| PRESETS.lock().ok().and_then(|known| known.get(key).cloned());
+    let known = |key: &str| {
+        PRESETS
+            .lock()
+            .ok()
+            .and_then(|known| known.get(key).cloned())
+    };
     if let Some(id) = known(key) {
         return Ok(id);
     }
@@ -395,7 +411,11 @@ pub struct Speaker {
 }
 
 impl Speaker {
-    pub fn new(app: &AppHandle, voice: Option<String>, language: Option<String>) -> Result<Self, String> {
+    pub fn new(
+        app: &AppHandle,
+        voice: Option<String>,
+        language: Option<String>,
+    ) -> Result<Self, String> {
         if !usable() {
             return Err("Voicebox isn't on this computer. Get it in Explore to hear Misty.".into());
         }

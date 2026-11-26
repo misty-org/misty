@@ -16,8 +16,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use space_drive::{
-    ChangedEntry, Drive, DriveConfig, DriveError, DriveStatus, Events, Notice, OsFace,
-    SpaceId, SpaceMount, StatusKind,
+    ChangedEntry, Drive, DriveConfig, DriveError, DriveStatus, Events, Notice, OsFace, SpaceId,
+    SpaceMount, StatusKind,
 };
 use tauri::{AppHandle, Emitter, Manager};
 

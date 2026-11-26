@@ -38,9 +38,7 @@ export function useVoicebox(): VoiceboxState | null {
     const ask = () => void voiceboxState().then((found) => live && setState(found));
     ask();
     window.addEventListener(SPEECH_CHANGED, ask);
-    const unlisten = hasTauriInternals()
-      ? CHANGES.map((name) => listenEvent(name, ask))
-      : [];
+    const unlisten = hasTauriInternals() ? CHANGES.map((name) => listenEvent(name, ask)) : [];
     return () => {
       live = false;
       window.removeEventListener(SPEECH_CHANGED, ask);

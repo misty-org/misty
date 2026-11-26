@@ -1,13 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import {
-  ErrorState,
-  FindBar,
-  FramedBar,
-  FramedPage,
-  PageStage,
-  notify,
-} from "@misty/ui";
+import { ErrorState, FindBar, FramedBar, FramedPage, PageStage, notify } from "@misty/ui";
 import { useBrowserRuntimeStore, useWorkspaceViewTitle } from "@/features/app-windows";
 import { BrowserNavigationButtons } from "../webviews/BrowserNavigationButtons";
 import { usePresentedPageHost } from "../webviews/presented_page_host";
@@ -159,7 +152,10 @@ export function WebTabPage(props: WebTabPageProps) {
       void takeWebPicture(viewId)
         .then(setAnnotating)
         .catch((error: unknown) =>
-          notify({ message: failureText(error, "The page's picture couldn't be taken."), tone: "error" }),
+          notify({
+            message: failureText(error, "The page's picture couldn't be taken."),
+            tone: "error",
+          }),
         );
     }, 250);
 

@@ -59,10 +59,8 @@ pub(crate) async fn execute_agent_request(
                 .unwrap_or(current),
             _ => current,
         };
-        crate::browser::agent_pages::account_sites::gate_person_tab(
-            &app, &id, &request, &reaching,
-        )
-        .await?;
+        crate::browser::agent_pages::account_sites::gate_person_tab(&app, &id, &request, &reaching)
+            .await?;
     }
     if matches!(
         request.operation.as_str(),

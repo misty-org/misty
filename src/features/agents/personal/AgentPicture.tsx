@@ -21,15 +21,7 @@ export function AgentAvatar({
   glyph?: boolean;
   className?: string;
 }) {
-  const size: AvatarSize = large
-    ? "xl"
-    : glyph
-      ? "glyph"
-      : face
-        ? "sm"
-        : compact
-          ? "xs"
-          : "lg";
+  const size: AvatarSize = large ? "xl" : glyph ? "glyph" : face ? "sm" : compact ? "xs" : "lg";
   const faceClass = cn("agent-avatar", className);
   const tone = agent ? personTone(agent.id) : undefined;
   const avatar = agent?.avatar as

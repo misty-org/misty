@@ -15,7 +15,10 @@ const spaceAgentSchema = z.object({
   instructions: z.string().default(""),
   soul: z.string().default(""),
   icon: z.string().default(""),
-  avatar: z.record(z.string(), z.json()).nullish().transform((value) => value ?? {}),
+  avatar: z
+    .record(z.string(), z.json())
+    .nullish()
+    .transform((value) => value ?? {}),
   voice_id: z.string().default(""),
   engine_id: z.string().default(""),
   engine_model: z.string().default(""),

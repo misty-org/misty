@@ -67,8 +67,16 @@ fn now() -> i64 {
         .unwrap_or(0)
 }
 
-fn record(app: &AppHandle, kind: &str, id: &str, digest: &str, name: &str, placed: &[Placed]) -> Result<(), String> {
-    let placed = serde_json::to_string(&json!({ "name": name, "placed": placed })).map_err(|error| error.to_string())?;
+fn record(
+    app: &AppHandle,
+    kind: &str,
+    id: &str,
+    digest: &str,
+    name: &str,
+    placed: &[Placed],
+) -> Result<(), String> {
+    let placed = serde_json::to_string(&json!({ "name": name, "placed": placed }))
+        .map_err(|error| error.to_string())?;
     store(app)
         .connect()
         .and_then(|connection| {
@@ -104,7 +112,11 @@ fn records(app: &AppHandle) -> Result<Vec<InstallRecord>, String> {
                 kind,
                 id,
                 digest,
-                name: body.get("name").and_then(Value::as_str).unwrap_or("").to_string(),
+                name: body
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
                 placed: body
                     .get("placed")
                     .cloned()
@@ -149,7 +161,10 @@ fn manifest_of(folder: &Path) -> Value {
 fn write_marketplace(root: &Path) -> Result<(), String> {
     let mut plugins = Vec::new();
     if let Ok(entries) = file_access::fs::read_dir(root.join("plugins")) {
-        let mut folders: Vec<PathBuf> = entries.filter_map(Result::ok).map(|entry| entry.path()).collect();
+        let mut folders: Vec<PathBuf> = entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect();
         folders.sort();
         for folder in folders {
             let manifest = manifest_of(&folder);
@@ -167,7 +182,8 @@ fn write_marketplace(root: &Path) -> Result<(), String> {
         }
     }
     let catalog = json!({ "name": MARKETPLACE, "owner": { "name": "Misty" }, "plugins": plugins });
-    file_access::fs::create_dir_all(root.join(".claude-plugin")).map_err(|error| error.to_string())?;
+    file_access::fs::create_dir_all(root.join(".claude-plugin"))
+        .map_err(|error| error.to_string())?;
     file_access::fs::write(
         root.join(".claude-plugin").join("marketplace.json"),
         serde_json::to_vec_pretty(&catalog).map_err(|error| error.to_string())?,
@@ -190,7 +206,16 @@ fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-const COMPONENTS: &[&str] = &[".claude-plugin", ".codex-plugin", "skills", "commands", "agents", "hooks", "hooks.json", ".mcp.json"];
+const COMPONENTS: &[&str] = &[
+    ".claude-plugin",
+    ".codex-plugin",
+    "skills",
+    "commands",
+    "agents",
+    "hooks",
+    "hooks.json",
+    ".mcp.json",
+];
 
 fn relative(path: &str) -> Option<PathBuf> {
     let mut clean = PathBuf::new();
@@ -222,7 +247,12 @@ fn skill_folders(dir: &Path) -> Vec<PathBuf> {
             .filter(|path| {
                 path.file_name()
                     .and_then(|name| name.to_str())
-                    .is_some_and(|name| !matches!(name, ".git" | ".claude-plugin" | ".codex-plugin" | "node_modules"))
+                    .is_some_and(|name| {
+                        !matches!(
+                            name,
+                            ".git" | ".claude-plugin" | ".codex-plugin" | "node_modules"
+                        )
+                    })
             })
             .collect();
         children.sort();
@@ -241,7 +271,11 @@ fn skill_name(folder: &Path, fallback: &str) -> String {
         .and_then(|text| {
             let front = text.strip_prefix("---")?.split("\n---").next()?.to_string();
             front.lines().find_map(|line| {
-                let value = line.trim().strip_prefix("name:")?.trim().trim_matches(['"', '\'']);
+                let value = line
+                    .trim()
+                    .strip_prefix("name:")?
+                    .trim()
+                    .trim_matches(['"', '\'']);
                 plain(value).then(|| value.to_string())
             })
         })
@@ -252,7 +286,11 @@ fn gather_skills(mine: &Path, manifest: &mut Value, fallback: &str) -> std::io::
     let skills = mine.join("skills");
     let declared: Vec<String> = match manifest.get("skills") {
         Some(Value::String(one)) => vec![one.clone()],
-        Some(Value::Array(many)) => many.iter().filter_map(Value::as_str).map(str::to_string).collect(),
+        Some(Value::Array(many)) => many
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect(),
         _ => Vec::new(),
     };
     if declared.is_empty() && file_access::fs::is_dir(&skills) {
@@ -286,14 +324,21 @@ fn gather_skills(mine: &Path, manifest: &mut Value, fallback: &str) -> std::io::
             file_access::fs::create_dir_all(&target)?;
             for entry in file_access::fs::read_dir(mine)?.filter_map(Result::ok) {
                 let file_name = entry.file_name();
-                if file_name.to_str().is_some_and(|name| COMPONENTS.contains(&name)) {
+                if file_name
+                    .to_str()
+                    .is_some_and(|name| COMPONENTS.contains(&name))
+                {
                     continue;
                 }
                 file_access::fs::rename(entry.path(), target.join(file_name))?;
             }
             continue;
         }
-        let own = folder.file_name().and_then(|name| name.to_str()).filter(|name| plain(name)).map(str::to_string);
+        let own = folder
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| plain(name))
+            .map(str::to_string);
         let target = skills.join(own.unwrap_or_else(|| skill_name(&folder, fallback)));
         if !file_access::fs::exists(&target) {
             file_access::fs::create_dir_all(&skills)?;
@@ -331,8 +376,13 @@ pub struct PluginRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "result")]
 pub enum PluginOutcome {
-    Installed { placed: Vec<Placed> },
-    ConfirmCommand { engine: String, command: marketplace::ShownCommand },
+    Installed {
+        placed: Vec<Placed>,
+    },
+    ConfirmCommand {
+        engine: String,
+        command: marketplace::ShownCommand,
+    },
 }
 
 #[tauri::command]
@@ -344,7 +394,14 @@ pub async fn registry_plugin_install(
     person_window(&webview)?;
     let (name, outcome) = place_plugin(&request).await?;
     if let PluginOutcome::Installed { placed } = &outcome {
-        record(&app, "plugins", &request.id, &request.bundle.sha256, &name, placed)?;
+        record(
+            &app,
+            "plugins",
+            &request.id,
+            &request.bundle.sha256,
+            &name,
+            placed,
+        )?;
     }
     Ok(outcome)
 }
@@ -365,13 +422,20 @@ async fn place_plugin(request: &PluginRequest) -> Result<(String, PluginOutcome)
     let mine = root.join("plugins").join(&request.id);
     let _ = file_access::fs::remove_dir_all(&mine);
     copy_tree(&folder, &mine).map_err(|error| error.to_string())?;
-    let fallback = request.path.rsplit('/').find(|part| plain(part)).unwrap_or(&name).to_string();
-    let gathered = gather_skills(&mine, &mut manifest, &fallback).map_err(|error| error.to_string())?;
+    let fallback = request
+        .path
+        .rsplit('/')
+        .find(|part| plain(part))
+        .unwrap_or(&name)
+        .to_string();
+    let gathered =
+        gather_skills(&mine, &mut manifest, &fallback).map_err(|error| error.to_string())?;
     if manifest.is_null() || gathered {
         if manifest.is_null() {
             manifest = json!({ "name": name, "description": request.description });
         }
-        file_access::fs::create_dir_all(mine.join(".claude-plugin")).map_err(|error| error.to_string())?;
+        file_access::fs::create_dir_all(mine.join(".claude-plugin"))
+            .map_err(|error| error.to_string())?;
         file_access::fs::write(
             mine.join(".claude-plugin").join("plugin.json"),
             serde_json::to_vec_pretty(&manifest).map_err(|error| error.to_string())?,
@@ -382,14 +446,33 @@ async fn place_plugin(request: &PluginRequest) -> Result<(String, PluginOutcome)
     let source = root.to_string_lossy().into_owned();
     let qualified = format!("{name}@{MARKETPLACE}");
     let mut placed = Vec::new();
-    for engine in request.native.iter().filter_map(|engine| engine_name(engine)) {
+    for engine in request
+        .native
+        .iter()
+        .filter_map(|engine| engine_name(engine))
+    {
         if marketplace::add_source(engine, &source).await.is_err() && engine == "claude" {
-            let _ = marketplace::run_ok(engine, &["plugin", "marketplace", "update", MARKETPLACE], std::time::Duration::from_secs(60)).await;
+            let _ = marketplace::run_ok(
+                engine,
+                &["plugin", "marketplace", "update", MARKETPLACE],
+                std::time::Duration::from_secs(60),
+            )
+            .await;
         }
         match marketplace::install(engine, &qualified, request.accept.clone()).await? {
-            InstallOutcome::Installed => placed.push(Placed { engine: engine.into(), how: "plugin".into(), skills: Vec::new() }),
+            InstallOutcome::Installed => placed.push(Placed {
+                engine: engine.into(),
+                how: "plugin".into(),
+                skills: Vec::new(),
+            }),
             InstallOutcome::ConfirmCommand { command } => {
-                return Ok((name, PluginOutcome::ConfirmCommand { engine: engine.into(), command }));
+                return Ok((
+                    name,
+                    PluginOutcome::ConfirmCommand {
+                        engine: engine.into(),
+                        command,
+                    },
+                ));
             }
         }
     }
@@ -401,7 +484,11 @@ async fn place_plugin(request: &PluginRequest) -> Result<(String, PluginOutcome)
                 if !file_access::fs::is_file(skill.join("SKILL.md")) {
                     continue;
                 }
-                let Some(dir) = skill.file_name().and_then(|name| name.to_str()).map(str::to_string) else {
+                let Some(dir) = skill
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(str::to_string)
+                else {
                     continue;
                 };
                 let (owner, repo) = request.repo.split_once('/').unwrap_or(("", ""));
@@ -413,23 +500,39 @@ async fn place_plugin(request: &PluginRequest) -> Result<(String, PluginOutcome)
                     "repoName": repo,
                     "repoBranch": request.commit,
                 });
-                let installed = crate::engine_config::skills_hub::install_from_folder(skill, input, request.skill_targets.clone()).await?;
+                let installed = crate::engine_config::skills_hub::install_from_folder(
+                    skill,
+                    input,
+                    request.skill_targets.clone(),
+                )
+                .await?;
                 if let Some(id) = installed.pointer("/skill/id").and_then(Value::as_str) {
                     skills.push(id.to_string());
                 }
             }
         }
         for target in &request.skill_targets {
-            placed.push(Placed { engine: target.clone(), how: "skills".into(), skills: skills.clone() });
+            placed.push(Placed {
+                engine: target.clone(),
+                how: "skills".into(),
+                skills: skills.clone(),
+            });
         }
     }
     Ok((name, PluginOutcome::Installed { placed }))
 }
 
 #[tauri::command]
-pub async fn registry_plugin_remove(webview: tauri::Webview, app: AppHandle, id: String) -> Result<(), String> {
+pub async fn registry_plugin_remove(
+    webview: tauri::Webview,
+    app: AppHandle,
+    id: String,
+) -> Result<(), String> {
     person_window(&webview)?;
-    let Some(found) = records(&app)?.into_iter().find(|one| one.kind == "plugins" && one.id == id) else {
+    let Some(found) = records(&app)?
+        .into_iter()
+        .find(|one| one.kind == "plugins" && one.id == id)
+    else {
         return Ok(());
     };
     unplace_plugin(&id, &found.name, &found.placed).await?;
@@ -458,7 +561,10 @@ async fn unplace_plugin(id: &str, name: &str, placed: &[Placed]) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn registry_bundle_text(bundle: RegistryFile, path: Option<String>) -> Result<String, String> {
+pub async fn registry_bundle_text(
+    bundle: RegistryFile,
+    path: Option<String>,
+) -> Result<String, String> {
     let folder = unpacked(&bundle).await?;
     let path = match path.filter(|path| !path.is_empty()) {
         Some(path) => path,
@@ -475,13 +581,17 @@ pub async fn registry_bundle_text(bundle: RegistryFile, path: Option<String>) ->
 
 #[tauri::command]
 pub async fn registry_sample(file: RegistryFile) -> Result<tauri::ipc::Response, String> {
-    blob(&file, MAX_SAMPLE_BYTES).await.map(tauri::ipc::Response::new)
+    blob(&file, MAX_SAMPLE_BYTES)
+        .await
+        .map(tauri::ipc::Response::new)
 }
 
 fn env_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 64
-        && name.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
         && !name.starts_with(|c: char| c.is_ascii_digit())
 }
 
@@ -500,7 +610,11 @@ pub fn registry_mcp_keys(
 }
 
 fn write_mcp_keys(server: &str, values: &[(String, String)]) -> Result<String, String> {
-    if !plain(server) || values.iter().any(|(name, value)| !env_name(name) || value.contains('\0')) {
+    if !plain(server)
+        || values
+            .iter()
+            .any(|(name, value)| !env_name(name) || value.contains('\0'))
+    {
         return Err("Those keys can't be kept.".into());
     }
     let folder = home()?.join(".env").join("client").join("mcp");
@@ -521,7 +635,8 @@ fn write_mcp_keys(server: &str, values: &[(String, String)]) -> Result<String, S
     {
         use std::os::unix::fs::PermissionsExt;
         let _ = file_access::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o700));
-        file_access::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).map_err(|error| error.to_string())?;
+        file_access::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600))
+            .map_err(|error| error.to_string())?;
     }
     Ok(file.to_string_lossy().into_owned())
 }
@@ -531,7 +646,8 @@ mod tests {
     use super::*;
 
     fn picked(var: &str) -> Value {
-        serde_json::from_str(&std::env::var(var).unwrap_or_else(|_| panic!("set {var}"))).expect("JSON entry")
+        serde_json::from_str(&std::env::var(var).unwrap_or_else(|_| panic!("set {var}")))
+            .expect("JSON entry")
     }
 
     fn file_of(entry: &Value) -> RegistryFile {
@@ -540,10 +656,20 @@ mod tests {
 
     async fn engine_lists(engine: &str, name: &str) -> bool {
         let qualified = format!("{name}@{MARKETPLACE}");
-        let out = marketplace::run_ok(engine, &["plugin", "list", "--json"], std::time::Duration::from_secs(60))
-            .await
-            .unwrap_or_default();
-        eprintln!("{engine} plugin list: {}", out.replace(char::is_whitespace, "").chars().take(500).collect::<String>());
+        let out = marketplace::run_ok(
+            engine,
+            &["plugin", "list", "--json"],
+            std::time::Duration::from_secs(60),
+        )
+        .await
+        .unwrap_or_default();
+        eprintln!(
+            "{engine} plugin list: {}",
+            out.replace(char::is_whitespace, "")
+                .chars()
+                .take(500)
+                .collect::<String>()
+        );
         out.contains(&qualified) || out.contains(&format!("\"{name}\""))
     }
 
@@ -554,8 +680,15 @@ mod tests {
         let _ = rustls::crypto::ring::default_provider().install_default();
         file_access::paths::isolate_for_tests();
         let home = PathBuf::from(std::env::var("HOME").unwrap());
-        let file = write_mcp_keys("brave-search", &[("BRAVE_API_KEY".into(), "misty's test key".into())]).unwrap();
-        assert!(PathBuf::from(&file).starts_with(home.join(".misty")), "the key stays under the root");
+        let file = write_mcp_keys(
+            "brave-search",
+            &[("BRAVE_API_KEY".into(), "misty's test key".into())],
+        )
+        .unwrap();
+        assert!(
+            PathBuf::from(&file).starts_with(home.join(".misty")),
+            "the key stays under the root"
+        );
         assert!(file.ends_with(".env/client/mcp/brave-search.env"));
         let target = || McpAddTarget::Stdio {
             command: "/bin/sh".into(),
@@ -580,14 +713,32 @@ mod tests {
             .await
             .unwrap_or_else(|error| panic!("{engine} adds the server: {error:?}"));
         }
-        let claude = marketplace::run_ok("claude", &["mcp", "list"], std::time::Duration::from_secs(120)).await.unwrap();
+        let claude = marketplace::run_ok(
+            "claude",
+            &["mcp", "list"],
+            std::time::Duration::from_secs(120),
+        )
+        .await
+        .unwrap();
         eprintln!("claude mcp list: {claude}");
-        assert!(claude.contains("brave-search") && claude.contains("Connected"), "Claude Code starts the server with its key");
-        let codex = marketplace::run_ok("codex", &["mcp", "list"], std::time::Duration::from_secs(60)).await.unwrap();
+        assert!(
+            claude.contains("brave-search") && claude.contains("Connected"),
+            "Claude Code starts the server with its key"
+        );
+        let codex = marketplace::run_ok(
+            "codex",
+            &["mcp", "list"],
+            std::time::Duration::from_secs(60),
+        )
+        .await
+        .unwrap();
         eprintln!("codex mcp list: {codex}");
         assert!(codex.contains("brave-search"), "Codex has the server");
         let config = std::fs::read_to_string(home.join(".claude.json")).unwrap_or_default();
-        assert!(!config.contains("misty's test key"), "the key never sits in the engine's config");
+        assert!(
+            !config.contains("misty's test key"),
+            "the key never sits in the engine's config"
+        );
     }
 
     #[tokio::test]
@@ -598,15 +749,23 @@ mod tests {
         let home = PathBuf::from(std::env::var("HOME").unwrap());
 
         let sample: RegistryFile = serde_json::from_value(picked("MISTY_E2E_SAMPLE")).unwrap();
-        let sound = blob(&sample, MAX_SAMPLE_BYTES).await.expect("the sample downloads and matches");
+        let sound = blob(&sample, MAX_SAMPLE_BYTES)
+            .await
+            .expect("the sample downloads and matches");
         assert_eq!(sound.len() as u64, sample.size);
 
         let template = picked("MISTY_E2E_TEMPLATE");
-        let text = registry_bundle_text(file_of(&template), None).await.expect("the template reads");
+        let text = registry_bundle_text(file_of(&template), None)
+            .await
+            .expect("the template reads");
         assert!(text.len() > 40, "the template has instructions");
 
         let skill = picked("MISTY_E2E_SKILL");
-        let (owner, repo) = skill["source"]["repo"].as_str().unwrap().split_once('/').unwrap();
+        let (owner, repo) = skill["source"]["repo"]
+            .as_str()
+            .unwrap()
+            .split_once('/')
+            .unwrap();
         let installed = crate::engine_config::skills_hub::install_from_folder(
             unpacked(&file_of(&skill)).await.expect("the skill unpacks"),
             json!({
@@ -618,11 +777,29 @@ mod tests {
         )
         .await
         .expect("the skill installs");
-        let directory = installed.pointer("/skill/directory").and_then(Value::as_str).unwrap().to_string();
-        assert!(home.join(".claude/skills").join(&directory).join("SKILL.md").is_file(), "Claude Code sees the skill");
-        crate::engine_config::skills_hub::uninstall(installed.pointer("/skill/id").and_then(Value::as_str).unwrap())
-            .expect("the skill removes");
-        assert!(!home.join(".claude/skills").join(&directory).exists(), "the skill is gone from Claude Code");
+        let directory = installed
+            .pointer("/skill/directory")
+            .and_then(Value::as_str)
+            .unwrap()
+            .to_string();
+        assert!(
+            home.join(".claude/skills")
+                .join(&directory)
+                .join("SKILL.md")
+                .is_file(),
+            "Claude Code sees the skill"
+        );
+        crate::engine_config::skills_hub::uninstall(
+            installed
+                .pointer("/skill/id")
+                .and_then(Value::as_str)
+                .unwrap(),
+        )
+        .expect("the skill removes");
+        assert!(
+            !home.join(".claude/skills").join(&directory).exists(),
+            "the skill is gone from Claude Code"
+        );
 
         let plugin = picked("MISTY_E2E_PLUGIN");
         let engines: Vec<String> = std::env::var("MISTY_E2E_ENGINES")
@@ -646,11 +823,20 @@ mod tests {
             panic!("an engine asked to run a command for this plugin; pick one without");
         };
         for engine in &engines {
-            assert!(placed.iter().any(|one| &one.engine == engine && one.how == "plugin"), "{engine} took the plugin");
+            assert!(
+                placed
+                    .iter()
+                    .any(|one| &one.engine == engine && one.how == "plugin"),
+                "{engine} took the plugin"
+            );
             assert!(engine_lists(engine, &name).await, "{engine} lists {name}");
         }
         if plugin["includes"]["skills"].as_u64().unwrap_or(0) > 0 {
-            let skills = marketplace_dir().unwrap().join("plugins").join(&request.id).join("skills");
+            let skills = marketplace_dir()
+                .unwrap()
+                .join("plugins")
+                .join(&request.id)
+                .join("skills");
             let laid_out = std::fs::read_dir(&skills)
                 .into_iter()
                 .flatten()
@@ -658,13 +844,28 @@ mod tests {
                 .filter(|entry| entry.path().join("SKILL.md").is_file())
                 .count();
             eprintln!("{} skills laid out under {}", laid_out, skills.display());
-            assert!(laid_out > 0, "the plugin's skills sit where the engines find them");
-            let elsewhere = placed.iter().find(|one| one.engine == "gemini").map(|one| one.skills.len()).unwrap_or(0);
-            assert_eq!(elsewhere, laid_out, "every skill reached the engine without plugins");
+            assert!(
+                laid_out > 0,
+                "the plugin's skills sit where the engines find them"
+            );
+            let elsewhere = placed
+                .iter()
+                .find(|one| one.engine == "gemini")
+                .map(|one| one.skills.len())
+                .unwrap_or(0);
+            assert_eq!(
+                elsewhere, laid_out,
+                "every skill reached the engine without plugins"
+            );
         }
-        unplace_plugin(&request.id, &name, &placed).await.expect("the plugin removes");
+        unplace_plugin(&request.id, &name, &placed)
+            .await
+            .expect("the plugin removes");
         for engine in &engines {
-            assert!(!engine_lists(engine, &name).await, "{engine} no longer lists {name}");
+            assert!(
+                !engine_lists(engine, &name).await,
+                "{engine} no longer lists {name}"
+            );
         }
     }
 
@@ -678,13 +879,18 @@ mod tests {
         };
 
         let root = scratch.join("root");
-        write(&root.join("SKILL.md"), "---\nname: beautiful-article\ndescription: x\n---\nBody");
+        write(
+            &root.join("SKILL.md"),
+            "---\nname: beautiful-article\ndescription: x\n---\nBody",
+        );
         write(&root.join("references/types.md"), "types");
         write(&root.join("LICENSE"), "MIT");
         let mut manifest = Value::Null;
         assert!(gather_skills(&root, &mut manifest, "fallback").unwrap());
         assert!(root.join("skills/beautiful-article/SKILL.md").is_file());
-        assert!(root.join("skills/beautiful-article/references/types.md").is_file());
+        assert!(root
+            .join("skills/beautiful-article/references/types.md")
+            .is_file());
         assert!(!root.join("SKILL.md").exists());
 
         let loose = scratch.join("loose");

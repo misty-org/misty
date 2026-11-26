@@ -28,7 +28,7 @@ describe("context window memory", () => {
   });
 
   it("treats a broken storage as a cache miss instead of crashing", () => {
-    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("quota exceeded");
     });
 

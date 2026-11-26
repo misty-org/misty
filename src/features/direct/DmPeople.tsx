@@ -41,13 +41,7 @@ const longDate = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
-export function DmFace({
-  person,
-  size,
-}: {
-  person: Person;
-  size?: Exclude<AvatarSize, "glyph">;
-}) {
+export function DmFace({ person, size }: { person: Person; size?: Exclude<AvatarSize, "glyph"> }) {
   const presence = usePresence(person.user_id);
   const picture = useMemberPicture(person.user_id, person.avatar_version);
   return (

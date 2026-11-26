@@ -2,8 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
 export type SearchSuggestion =
-  | { kind: "query"; text: string }
-  | { kind: "site"; text: string; url: string };
+  { kind: "query"; text: string } | { kind: "site"; text: string; url: string };
 
 export const useWebSearch = create<{ suggestions: boolean }>(() => ({ suggestions: false }));
 

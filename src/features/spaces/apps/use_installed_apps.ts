@@ -65,7 +65,10 @@ function load(): Promise<void> {
     } catch (reason) {
       write({
         apps: entry.apps,
-        error: reason instanceof Error ? reason.message : String(reason || "The apps couldn't be loaded."),
+        error:
+          reason instanceof Error
+            ? reason.message
+            : String(reason || "The apps couldn't be loaded."),
       });
     } finally {
       loading = null;

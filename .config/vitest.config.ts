@@ -27,6 +27,7 @@ export default defineConfig({
     server: { deps: { inline: [/[\\/]misty-ui[\\/]node_modules[\\/]/] } },
     environment: "jsdom",
     pool: "threads",
+    execArgv: ["--no-experimental-webstorage"],
     maxWorkers: process.env.MISTY_SHARED_CPU
       ? Math.max(1, Math.floor(availableParallelism() / 2))
       : Math.max(1, Math.min(10, availableParallelism() - 3)),

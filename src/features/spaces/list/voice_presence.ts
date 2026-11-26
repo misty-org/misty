@@ -58,5 +58,6 @@ onRealtimeMessage("voice", (message) => {
 });
 
 onRealtimeOpen(() => {
-  for (const spaceId of watched.keys()) sendRealtimeMessage({ type: "voice.sync", space_id: spaceId });
+  for (const spaceId of watched.keys())
+    sendRealtimeMessage({ type: "voice.sync", space_id: spaceId });
 });

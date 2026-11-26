@@ -1,11 +1,6 @@
 import { disk } from "@/features/files";
 import { diskItem, type FileItem, type FilesPlace } from "./model";
-import {
-  diskFolder,
-  driveFolder,
-  listTrash,
-  projectFolder,
-} from "./sources";
+import { diskFolder, driveFolder, listTrash, projectFolder } from "./sources";
 
 const shown = (items: FileItem[], hidden: boolean) =>
   hidden ? items : items.filter((item) => !item.hidden);

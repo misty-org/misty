@@ -34,17 +34,17 @@ pub mod commands;
 mod companion;
 mod events;
 pub mod folder_grant;
+pub(crate) mod gate;
 pub mod gemini;
 pub mod grok;
 pub mod hermes;
-pub(crate) mod gate;
 pub mod history;
 pub mod history_commands;
 pub mod images;
-pub mod kimi;
-mod kimi_acp;
 #[cfg(windows)]
 pub(crate) mod job;
+pub mod kimi;
+mod kimi_acp;
 pub(crate) mod mcp;
 pub mod minimax;
 mod minimax_acp;
@@ -654,7 +654,9 @@ fn prepare_launch(
         .filter(|e| !e.trim().is_empty());
     for choice in [model.as_deref(), effort.as_deref()].into_iter().flatten() {
         if !plain_choice(choice) {
-            return Err(format!("\"{choice}\" isn't a model or level this engine can take."));
+            return Err(format!(
+                "\"{choice}\" isn't a model or level this engine can take."
+            ));
         }
     }
     let req = SendRequest {
@@ -2337,7 +2339,10 @@ mod plan_respond_tests;
 
 pub(crate) fn plain_choice(name: &str) -> bool {
     name.len() <= 200
-        && name.chars().next().is_some_and(|first| first.is_ascii_alphanumeric())
+        && name
+            .chars()
+            .next()
+            .is_some_and(|first| first.is_ascii_alphanumeric())
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || "._:/@+-[]~".contains(c))
@@ -2349,7 +2354,13 @@ mod plain_choice_tests {
 
     #[test]
     fn a_model_from_the_space_is_a_plain_name_never_an_option() {
-        for name in ["gemini-2.5-pro", "claude-opus-4[1m]", "qwen3-coder:30b", "openai/gpt-5", "high"] {
+        for name in [
+            "gemini-2.5-pro",
+            "claude-opus-4[1m]",
+            "qwen3-coder:30b",
+            "openai/gpt-5",
+            "high",
+        ] {
             assert!(plain_choice(name), "{name}");
         }
         for name in ["--yolo", "-y", "x --yolo", "x\n--yolo", "", "x;rm", "$(id)"] {

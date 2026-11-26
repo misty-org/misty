@@ -48,9 +48,7 @@ function inCall(host: AppCallsHost, spaceId: string, channelId: string): Promise
     };
     const timer = window.setTimeout(
       () =>
-        finish(
-          new HostError("internal", "Couldn’t join the voice channel in time. Try again."),
-        ),
+        finish(new HostError("internal", "Couldn’t join the voice channel in time. Try again.")),
       JOIN_WAIT_MS,
     );
     stop = host.subscribe(check);

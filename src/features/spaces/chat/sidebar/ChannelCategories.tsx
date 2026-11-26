@@ -49,7 +49,9 @@ export function ChannelHeadingTools(props: {
     void spacesApi
       .updateCategory(props.spaceId, category.id, { afterId })
       .then(() => reload())
-      .catch(() => notify({ message: "The category couldn't be moved. Try again.", tone: "error" }));
+      .catch(() =>
+        notify({ message: "The category couldn't be moved. Try again.", tone: "error" }),
+      );
   };
 
   const remove = () => {

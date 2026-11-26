@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use voice_speech::{
-    decode_file, recognize_file, use_helper, Hearing, HearingEvent,
-    HearingFamily, HearingSpec, Recognizer, VadSpec,
+    decode_file, recognize_file, use_helper, Hearing, HearingEvent, HearingFamily, HearingSpec,
+    Recognizer, VadSpec,
 };
 
 fn helper() -> Result<std::process::Command, String> {
@@ -94,4 +94,3 @@ fn hears_live_audio_and_tells_what_was_said_once_closed() {
     assert!(started, "speech start was never told");
     assert!(!heard.trim().is_empty(), "nothing was heard");
 }
-

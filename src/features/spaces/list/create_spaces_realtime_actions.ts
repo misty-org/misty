@@ -311,10 +311,14 @@ function resyncSpaces(get: () => SpacesStore) {
     const quietly = (read: Promise<unknown>) => read.catch(() => undefined);
     const reads: Promise<unknown>[] = [quietly(refreshWatchedSpaceResources())];
     for (const spaceId of Object.keys(state.messagesBySpace))
-      reads.push(quietly(coalescedReload(`messages:${spaceId}`, () => get().loadMessages(spaceId))));
+      reads.push(
+        quietly(coalescedReload(`messages:${spaceId}`, () => get().loadMessages(spaceId))),
+      );
     for (const spaceId of Object.keys(state.membersBySpace))
       if (known.has(spaceId))
-        reads.push(quietly(coalescedReload(`members:${spaceId}`, () => get().loadMembers(spaceId))));
+        reads.push(
+          quietly(coalescedReload(`members:${spaceId}`, () => get().loadMembers(spaceId))),
+        );
     for (const spaceId of Object.keys(state.nodesBySpace))
       if (known.has(spaceId))
         reads.push(quietly(coalescedReload(`nodes:${spaceId}`, () => get().loadNodes(spaceId))));

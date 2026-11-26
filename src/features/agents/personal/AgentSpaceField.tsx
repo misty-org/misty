@@ -69,9 +69,7 @@ export function AgentSpaceField({ agent }: { agent: AgentProfile }) {
 export function CopyAgentToSpace({ agent }: { agent: AgentProfile }) {
   const home = useAgentHomeSpace(agent);
   const [busy, setBusy] = useState(false);
-  const shared = (home?.spaces ?? []).filter(
-    (space) => !space.is_default && space.id !== home?.id,
-  );
+  const shared = (home?.spaces ?? []).filter((space) => !space.is_default && space.id !== home?.id);
   if (!home || !shared.length || agent.system_managed) return null;
   const copy = (spaceId: string, name: string) => {
     setBusy(true);

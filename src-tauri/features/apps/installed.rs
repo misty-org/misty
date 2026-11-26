@@ -59,7 +59,12 @@ pub fn list(app: &AppHandle) -> Result<Vec<InstalledApp>, String> {
         .map_err(|error| error.to_string())?;
     let rows = statement
         .query_map([], |found| {
-            Ok(row(found.get(0)?, found.get(1)?, found.get(2)?, found.get(3)?))
+            Ok(row(
+                found.get(0)?,
+                found.get(1)?,
+                found.get(2)?,
+                found.get(3)?,
+            ))
         })
         .map_err(|error| error.to_string())?
         .filter_map(Result::ok)
@@ -136,10 +141,19 @@ pub async fn apps_install(
     }
     let source =
         source.ok_or_else(|| "Misty's registry doesn't say where to get this app.".to_owned())?;
-    let manifest =
-        install_bundle(app_id.clone(), version.clone(), source.url, source.sha256, source.wrap).await?;
+    let manifest = install_bundle(
+        app_id.clone(),
+        version.clone(),
+        source.url,
+        source.sha256,
+        source.wrap,
+    )
+    .await?;
     let asked: HashSet<Permission> = manifest.permissions.iter().copied().collect();
-    if permissions.iter().any(|permission| !asked.contains(permission)) {
+    if permissions
+        .iter()
+        .any(|permission| !asked.contains(permission))
+    {
         return Err("That's more than the app asks for.".into());
     }
     let mut approved = permissions;

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { LocalToolRejected } from "@/features/agents";
-import { acknowledge, answerAppCall, registerAppTools, unregisterAppTools } from "./app_tool_server";
+import {
+  acknowledge,
+  answerAppCall,
+  registerAppTools,
+  unregisterAppTools,
+} from "./app_tool_server";
 
 const invoked = vi.hoisted(() => ({ calls: [] as unknown[], refuse: false }));
 

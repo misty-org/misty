@@ -81,9 +81,7 @@ let accepting: IncomingRing | null = null;
 const starting = new Map<string, Promise<void>>();
 
 const missRing = (ring: IncomingRing) =>
-  useMissedCalls
-    .getState()
-    .miss(ring.dmId, { from: ring.from, video: ring.video, at: Date.now() });
+  useMissedCalls.getState().miss(ring.dmId, { from: ring.from, video: ring.video, at: Date.now() });
 
 const isGroupDm = (dmId: string) => peekDm(dmId)?.kind === "group";
 

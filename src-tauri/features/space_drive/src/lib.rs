@@ -1528,12 +1528,21 @@ mod tests {
     #[test]
     fn an_entry_takes_the_content_version_from_a_matching_item_when_its_base_has_none() {
         let mut base = Base::of(&item(4, None));
-        assert_eq!(content_version_of(Some(&base), Some(&item(4, Some(2)))), Some(Version(2)));
-        assert_eq!(content_version_of(Some(&base), Some(&item(5, Some(3)))), None);
+        assert_eq!(
+            content_version_of(Some(&base), Some(&item(4, Some(2)))),
+            Some(Version(2))
+        );
+        assert_eq!(
+            content_version_of(Some(&base), Some(&item(5, Some(3)))),
+            None
+        );
         assert_eq!(content_version_of(Some(&base), None), None);
         assert_eq!(content_version_of(None, Some(&item(4, Some(2)))), None);
         base.content_version = Some(Version(1));
-        assert_eq!(content_version_of(Some(&base), Some(&item(4, Some(2)))), Some(Version(1)));
+        assert_eq!(
+            content_version_of(Some(&base), Some(&item(4, Some(2)))),
+            Some(Version(1))
+        );
     }
 
     fn drive_entry(sha: Option<&str>) -> DriveEntry {

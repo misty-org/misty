@@ -209,7 +209,10 @@ pub struct BrowserHistoryForgetRequest {
 #[tauri::command]
 pub fn browser_history_forget(request: BrowserHistoryForgetRequest) -> Result<(), String> {
     library()?
-        .execute("DELETE FROM browser_history WHERE url = ?1", params![request.url])
+        .execute(
+            "DELETE FROM browser_history WHERE url = ?1",
+            params![request.url],
+        )
         .map_err(|error| error.to_string())?;
     Ok(())
 }
@@ -345,7 +348,10 @@ pub struct BrowserDownloadRequest {
 }
 
 #[tauri::command]
-pub fn browser_download_open(app: AppHandle, request: BrowserDownloadRequest) -> Result<(), String> {
+pub fn browser_download_open(
+    app: AppHandle,
+    request: BrowserDownloadRequest,
+) -> Result<(), String> {
     let path = library()?
         .query_row(
             "SELECT path FROM browser_downloads WHERE id = ?1 AND state = 'finished'",

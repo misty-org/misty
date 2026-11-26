@@ -24,10 +24,7 @@ const AppsIcon = spaceIcons.apps;
 const BrowserIcon = spaceIcons.browser;
 const ExploreIcon = spaceIcons.explore;
 
-export function SpaceRailNav(props: {
-  onOpen(view: WorkspaceView): void;
-  side: "left" | "right";
-}) {
+export function SpaceRailNav(props: { onOpen(view: WorkspaceView): void; side: "left" | "right" }) {
   const place = usePlace();
   const space = useWindowSpace();
   const shared = useSharedSpaces();
@@ -61,87 +58,91 @@ export function SpaceRailNav(props: {
           : "pl-[var(--pane-frame,calc(var(--spacing)*1.5))]",
       )}
     >
-    <Surface tone="sidebar" place={placeColor} className="flex min-h-0 flex-1 flex-col">
-      <div
-        className="h-(--ui-header) w-16 shrink-0"
-        data-misty-window-titlebar-region="true"
-        aria-hidden="true"
-      />
-    <SpaceRail
-      label="Spaces"
-      className="min-h-0 flex-1"
-      start={
-        <>
-          <SpaceRailItem
-            label="Personal"
-            selected={place === "personal"}
-            count={counts.personal}
-            waiting={counts.personalWaiting}
-            onSelect={() => choosePlace("personal")}
-          >
-            <AccountAvatar shape="tile" />
-          </SpaceRailItem>
-          <SpaceRailItem label="Files" selected={!appsOpen && focused === filesRoute} onSelect={openFiles}>
-            <FilesIcon aria-hidden="true" />
-          </SpaceRailItem>
-          {space ? (
+      <Surface tone="sidebar" place={placeColor} className="flex min-h-0 flex-1 flex-col">
+        <div
+          className="h-(--ui-header) w-16 shrink-0"
+          data-misty-window-titlebar-region="true"
+          aria-hidden="true"
+        />
+        <SpaceRail
+          label="Spaces"
+          className="min-h-0 flex-1"
+          start={
             <>
               <SpaceRailItem
-                data-tour="rail-apps"
-                label="Apps"
-                selected={appsOpen}
-                onSelect={openApps}
+                label="Personal"
+                selected={place === "personal"}
+                count={counts.personal}
+                waiting={counts.personalWaiting}
+                onSelect={() => choosePlace("personal")}
               >
-                <AppsIcon aria-hidden="true" />
+                <AccountAvatar shape="tile" />
               </SpaceRailItem>
-              <AppsLauncher
-                spaceId={space.id}
-                onOpen={(target) => openWorkspaceRoute(target, props.onOpen)}
-              />
+              <SpaceRailItem
+                label="Files"
+                selected={!appsOpen && focused === filesRoute}
+                onSelect={openFiles}
+              >
+                <FilesIcon aria-hidden="true" />
+              </SpaceRailItem>
+              {space ? (
+                <>
+                  <SpaceRailItem
+                    data-tour="rail-apps"
+                    label="Apps"
+                    selected={appsOpen}
+                    onSelect={openApps}
+                  >
+                    <AppsIcon aria-hidden="true" />
+                  </SpaceRailItem>
+                  <AppsLauncher
+                    spaceId={space.id}
+                    onOpen={(target) => openWorkspaceRoute(target, props.onOpen)}
+                  />
+                </>
+              ) : null}
+              <SpaceRailItem
+                label="Browser"
+                selected={!appsOpen && route.startsWith("/browser/")}
+                onSelect={openBrowser}
+              >
+                <BrowserIcon aria-hidden="true" />
+              </SpaceRailItem>
+              <SpaceRailItem
+                data-tour="sidebar-explore"
+                label="Explore"
+                selected={!appsOpen && Boolean(explore) && route === explore}
+                onSelect={openExplore}
+              >
+                <ExploreIcon aria-hidden="true" />
+              </SpaceRailItem>
             </>
-          ) : null}
-          <SpaceRailItem
-            label="Browser"
-            selected={!appsOpen && route.startsWith("/browser/")}
-            onSelect={openBrowser}
-          >
-            <BrowserIcon aria-hidden="true" />
-          </SpaceRailItem>
-          <SpaceRailItem
-            data-tour="sidebar-explore"
-            label="Explore"
-            selected={!appsOpen && Boolean(explore) && route === explore}
-            onSelect={openExplore}
-          >
-            <ExploreIcon aria-hidden="true" />
-          </SpaceRailItem>
-        </>
-      }
-    >
-      {shared.map((item) => {
-        const attention = counts.bySpace.get(item.id);
-        return (
-          <SpaceRailItem
-            key={item.id}
-            label={item.name}
-            selected={place === "spaces" && space?.id === item.id}
-            count={attention?.count}
-            waiting={attention?.waiting}
-            onSelect={() => switchSpaceWindow(item.id, false)}
-          >
-            <SpaceAvatar space={item} />
-          </SpaceRailItem>
-        );
-      })}
-      <GlobalCreateSpaceDialog>
-        {(create) => (
-          <SpaceRailItem label="New Space" count={invitations} onSelect={create}>
-            <Plus aria-hidden="true" />
-          </SpaceRailItem>
-        )}
-      </GlobalCreateSpaceDialog>
-    </SpaceRail>
-    </Surface>
+          }
+        >
+          {shared.map((item) => {
+            const attention = counts.bySpace.get(item.id);
+            return (
+              <SpaceRailItem
+                key={item.id}
+                label={item.name}
+                selected={place === "spaces" && space?.id === item.id}
+                count={attention?.count}
+                waiting={attention?.waiting}
+                onSelect={() => switchSpaceWindow(item.id, false)}
+              >
+                <SpaceAvatar space={item} />
+              </SpaceRailItem>
+            );
+          })}
+          <GlobalCreateSpaceDialog>
+            {(create) => (
+              <SpaceRailItem label="New Space" count={invitations} onSelect={create}>
+                <Plus aria-hidden="true" />
+              </SpaceRailItem>
+            )}
+          </GlobalCreateSpaceDialog>
+        </SpaceRail>
+      </Surface>
     </Surface>
   );
 }

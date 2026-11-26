@@ -24,9 +24,7 @@ export function definitionOf(agent: AgentProfileInput): Omit<SpaceAgentDefinitio
 }
 
 export function definitionFields(agent: AgentProfileInput): AgentDefinition {
-  return Object.fromEntries(
-    agentDefinitionKeys.map((key) => [key, agent[key]]),
-  ) as AgentDefinition;
+  return Object.fromEntries(agentDefinitionKeys.map((key) => [key, agent[key]])) as AgentDefinition;
 }
 
 export function sameDefinition(a: AgentProfileInput, b: AgentProfileInput) {

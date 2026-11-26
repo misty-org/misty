@@ -29,7 +29,9 @@ impl Package {
     pub fn download_url(&self) -> &str {
         self.mirror
             .as_deref()
-            .filter(|mirror| *mirror == format!("https://registry.mistysys.com/blobs/{}", self.sha256))
+            .filter(|mirror| {
+                *mirror == format!("https://registry.mistysys.com/blobs/{}", self.sha256)
+            })
             .unwrap_or(&self.url)
     }
 }
@@ -358,7 +360,9 @@ mod tests {
 
     fn package(mirror: Option<&str>) -> Package {
         Package {
-            url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx".into(),
+            url:
+                "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+                    .into(),
             sha256: "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6".into(),
             size: 643854,
             kind: "file".into(),

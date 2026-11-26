@@ -113,10 +113,7 @@ export function PermissionDock({ agentId }: { agentId?: string }) {
             </Button>
           </Tooltip>
           {rememberable ? (
-            <Tooltip
-              content={actionQuestionRemembers(question)}
-              shortcut="⌥⇧↵"
-            >
+            <Tooltip content={actionQuestionRemembers(question)} shortcut="⌥⇧↵">
               <Button
                 variant="secondary"
                 icon={Clock}

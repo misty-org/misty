@@ -1,4 +1,5 @@
 use crate::browser::*;
+#[cfg(target_os = "macos")]
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -19,17 +20,20 @@ pub(in crate::browser) use macos::page_failed;
 
 pub(in crate::browser) const WEB_TAB_SCOPE: &str = "web-scope-";
 
+#[cfg(target_os = "macos")]
 fn pages() -> &'static Mutex<HashMap<usize, String>> {
     static PAGES: OnceLock<Mutex<HashMap<usize, String>>> = OnceLock::new();
     PAGES.get_or_init(Mutex::default)
 }
 
+#[cfg(target_os = "macos")]
 fn page_of_view(view: usize) -> Option<String> {
     pages().lock().ok()?.get(&view).cloned()
 }
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
 
+#[cfg(target_os = "macos")]
 fn app() -> Option<&'static AppHandle> {
     APP.get()
 }
@@ -84,6 +88,7 @@ async fn page_value(webview: &Webview, script: String, wait: Duration) -> Result
         .map_err(|_| "The page closed before it responded.".to_owned())
 }
 
+#[cfg(target_os = "macos")]
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PageFailedEvent {
@@ -93,6 +98,7 @@ struct PageFailedEvent {
     message: String,
 }
 
+#[cfg(target_os = "macos")]
 fn emit_failed(id: &str, url: String, offline: bool, message: String) {
     let Some(app) = app() else { return };
     let _ = app.emit_to(

@@ -156,9 +156,7 @@ function VoiceBlock({
           key={person}
           name={nameOf(person)}
           speaking={speaking.includes(person)}
-          avatar={
-            <Face userId={person} name={nameOf(person)} size="xs" person={faceOf(person)} />
-          }
+          avatar={<Face userId={person} name={nameOf(person)} size="xs" person={faceOf(person)} />}
           className="pl-0"
         />
       ))}
@@ -216,9 +214,7 @@ export function FriendNow({ friends, activity }: { friends: Person[]; activity: 
       .find((member) => member.user_id === userId);
   return (
     <div className="grid min-w-0 gap-3">
-      {activity.voice ? (
-        <VoiceBlock spot={activity.voice} nameOf={nameOf} faceOf={faceOf} />
-      ) : null}
+      {activity.voice ? <VoiceBlock spot={activity.voice} nameOf={nameOf} faceOf={faceOf} /> : null}
       {activity.agents.map((spot) => (
         <AgentLine key={`${spot.space.id}:${spot.agent.id}`} spot={spot} />
       ))}

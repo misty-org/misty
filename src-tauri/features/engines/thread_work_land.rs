@@ -122,11 +122,7 @@ fn write_one(
     done.map(|_| ()).map_err(error_text)
 }
 
-fn apply(
-    drive: &Drive,
-    space: &SpaceId,
-    ops: &[Op],
-) -> Result<(), String> {
+fn apply(drive: &Drive, space: &SpaceId, ops: &[Op]) -> Result<(), String> {
     for op in ops {
         match op {
             Op::Write {

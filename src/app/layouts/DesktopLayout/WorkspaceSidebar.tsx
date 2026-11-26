@@ -6,10 +6,7 @@ import { SidebarNav } from "./SidebarNav";
 import { SidebarToggleButton } from "./SidebarToggleButton";
 import { SpaceNavigator } from "./SpaceNavigator";
 
-export function WorkspaceSidebar(props: {
-  position?: TabSide;
-  onOpen(view: WorkspaceView): void;
-}) {
+export function WorkspaceSidebar(props: { position?: TabSide; onOpen(view: WorkspaceView): void }) {
   const position = props.position ?? "left";
   const placeColor = useSidebarPlaceColor();
   return (

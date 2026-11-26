@@ -4,12 +4,16 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(target_os = "macos")]
 use serde_json::json;
-use tauri::{AppHandle, Emitter, Manager, Webview};
+#[cfg(target_os = "macos")]
+use tauri::Emitter;
+use tauri::{AppHandle, Manager, Webview};
 
 const SAME_NOTICE: Duration = Duration::from_secs(60);
 const TITLE_CHARS: usize = 120;
 const BODY_CHARS: usize = 200;
+#[cfg(target_os = "macos")]
 const OPEN_EVENT: &str = "misty://agent-run-notice-open";
 
 fn sent() -> &'static Mutex<HashMap<String, Instant>> {
@@ -42,6 +46,7 @@ fn misty_in_front(app: &AppHandle) -> bool {
         .any(|window| window.is_focused().unwrap_or(false))
 }
 
+#[cfg(target_os = "macos")]
 fn open_chat(app: &AppHandle, label: &str, route: &str) {
     let Some(window) = app.get_webview(label).map(|webview| webview.window()) else {
         if let Some(window) = crate::browser::app_windows::primary(app) {

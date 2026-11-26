@@ -40,7 +40,8 @@ fn collect<'a>(value: &'a Value, found: &mut Vec<(&'a str, &'a str)>) {
                     .get("media_type")
                     .or_else(|| source.get("mimeType"))
                     .and_then(Value::as_str);
-                if let (Some(mime), Some(data)) = (mime, source.get("data").and_then(Value::as_str)) {
+                if let (Some(mime), Some(data)) = (mime, source.get("data").and_then(Value::as_str))
+                {
                     found.push((mime, data));
                 }
                 return;
@@ -63,7 +64,9 @@ fn save(run_id: &str, tool_id: &str, index: usize, mime: &str, data: &str) -> Op
     if clean.len() > MOST_BYTES / 3 * 4 + 8 {
         return None;
     }
-    let bytes = base64::engine::general_purpose::STANDARD.decode(clean).ok()?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(clean)
+        .ok()?;
     if bytes.is_empty() {
         return None;
     }
@@ -77,7 +80,13 @@ fn save(run_id: &str, tool_id: &str, index: usize, mime: &str, data: &str) -> Op
 fn plain(text: &str) -> String {
     text.chars()
         .take(80)
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 

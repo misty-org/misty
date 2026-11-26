@@ -7,7 +7,9 @@ export const useAppUpdateRequired = create<{ minimum: string | null }>(() => ({ 
 
 export function withAppVersion(input: RequestInfo | URL, init: RequestInit): RequestInit {
   if (!version) return init;
-  const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined));
+  const headers = new Headers(
+    init.headers ?? (input instanceof Request ? input.headers : undefined),
+  );
   headers.set(header, version);
   return { ...init, headers };
 }

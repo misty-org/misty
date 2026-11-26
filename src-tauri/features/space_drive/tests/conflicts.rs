@@ -532,7 +532,9 @@ fn a_delete_moves_the_item_into_the_spaces_trash_where_it_can_be_put_back_or_pur
         assert!(a.in_trash(&space(), &id).unwrap());
         a.trash_now(&space(), &id).await.unwrap();
         assert!(
-            server.item_named("draft.md").is_some_and(|item| item.deleted),
+            server
+                .item_named("draft.md")
+                .is_some_and(|item| item.deleted),
             "a delete inside the trash is for good"
         );
         assert!(a.node(&space(), &id).unwrap().is_none());

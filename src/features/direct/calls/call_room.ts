@@ -8,9 +8,7 @@ export interface CallRoomCheck {
 }
 
 const isFull = (error: unknown) =>
-  Boolean(
-    error && typeof error === "object" && (error as { code?: unknown }).code === "room_full",
-  );
+  Boolean(error && typeof error === "object" && (error as { code?: unknown }).code === "room_full");
 
 export function checkCallRoom(room: string): Promise<CallRoomCheck> {
   return new Promise((resolve) => {

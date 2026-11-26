@@ -60,7 +60,11 @@ export function WebDownloadsButton(props: {
             <ErrorState
               inline
               title="Downloads couldn't load"
-              action={{ label: "Try again", variant: "secondary", onClick: () => void loadWebDownloads() }}
+              action={{
+                label: "Try again",
+                variant: "secondary",
+                onClick: () => void loadWebDownloads(),
+              }}
             />
           ) : !recent.length ? (
             <EmptyState inline title="No downloads yet" />

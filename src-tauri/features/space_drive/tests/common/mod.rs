@@ -361,10 +361,7 @@ impl State {
     fn restore(&mut self, id: &str, by: &Computer) -> Item {
         let trash = self.trash_folder();
         let mut item = self.items[id].clone();
-        let (from, mut wanted) = self
-            .origins
-            .remove(id)
-            .unwrap_or((None, item.name.clone()));
+        let (from, mut wanted) = self.origins.remove(id).unwrap_or((None, item.name.clone()));
         let target = from.filter(|parent| {
             self.items
                 .get(&parent.0)
@@ -511,9 +508,7 @@ impl FakeServer {
             .items
             .values()
             .filter(|item| {
-                !item.deleted
-                    && Some(&item.id.0) != trash.as_ref()
-                    && !state.in_trash(&item.id.0)
+                !item.deleted && Some(&item.id.0) != trash.as_ref() && !state.in_trash(&item.id.0)
             })
             .map(|item| (state.path_of(item), (item.kind, item.sha256.clone())))
             .collect()
@@ -814,8 +809,7 @@ impl FakeServer {
                 let trash = state.trash_folder();
                 let was_ignore =
                     is_root_ignore(current.parent_id.as_ref(), current.kind, &current.name);
-                let becomes_ignore =
-                    is_root_ignore(next.parent_id.as_ref(), next.kind, &next.name);
+                let becomes_ignore = is_root_ignore(next.parent_id.as_ref(), next.kind, &next.name);
                 let is_trash = Some(&current.id.0) == trash.as_ref();
                 let place_changes =
                     next.name != current.name || next.parent_id != current.parent_id;
@@ -840,12 +834,8 @@ impl FakeServer {
                     && trash.is_some()
                     && next.parent_id.as_ref().map(|parent| &parent.0) == trash.as_ref();
                 if into_trash && !replace {
-                    next.name = state.free_name(
-                        next.parent_id.as_ref(),
-                        &next.name,
-                        next.kind,
-                        Some(id),
-                    );
+                    next.name =
+                        state.free_name(next.parent_id.as_ref(), &next.name, next.kind, Some(id));
                 }
                 let moved = next.name != current.name || next.parent_id != current.parent_id;
                 let holder = if moved {
@@ -982,7 +972,8 @@ impl FakeServer {
                     }
                 }
                 let trash = state.trash_folder();
-                if trash.is_none() || item.parent_id.as_ref().map(|parent| &parent.0) != trash.as_ref()
+                if trash.is_none()
+                    || item.parent_id.as_ref().map(|parent| &parent.0) != trash.as_ref()
                 {
                     return reply(409, json!({ "code": "not_trashed" }));
                 }

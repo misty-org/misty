@@ -51,7 +51,13 @@ function AppLogo({ app, size = "tile" }: { app: ExploreCatalogApp; size?: "tile"
   );
 }
 
-function PermissionLines({ apps, permissions }: { apps: ExploreInstalledApps; permissions: string[] }) {
+function PermissionLines({
+  apps,
+  permissions,
+}: {
+  apps: ExploreInstalledApps;
+  permissions: string[];
+}) {
   return (
     <ul className="m-0 grid list-none gap-1 p-0">
       {permissions.map((permission) => (
@@ -129,9 +135,10 @@ function useAppAction(
       setBusy(false);
     }
   };
-  const asks = here === undefined
-    ? app.permissions
-    : app.permissions.filter((permission) => !approved.includes(permission));
+  const asks =
+    here === undefined
+      ? app.permissions
+      : app.permissions.filter((permission) => !approved.includes(permission));
   const get = () => {
     if (asks.length) setAsking(true);
     else void install();
@@ -147,7 +154,12 @@ function useAppAction(
   );
   if (progress)
     return {
-      action: { label: here === undefined ? "Get" : "Update", variant: "get", progress, onClick: get },
+      action: {
+        label: here === undefined ? "Get" : "Update",
+        variant: "get",
+        progress,
+        onClick: get,
+      },
       dialog,
     };
   if (here !== undefined && here !== app.version)
@@ -159,7 +171,11 @@ function useAppAction(
     };
   if (!onPage)
     return {
-      action: { label: "Get", variant: "get", onClick: () => nav.open({ kind: "apps", id: app.id }) },
+      action: {
+        label: "Get",
+        variant: "get",
+        onClick: () => nav.open({ kind: "apps", id: app.id }),
+      },
       dialog,
     };
   return { action: { label: "Get", variant: "get", disabled: busy, onClick: get }, dialog };

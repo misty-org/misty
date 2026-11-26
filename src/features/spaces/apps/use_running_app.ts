@@ -103,8 +103,7 @@ function sessionCheck(session: string): Authorize {
     );
     grants.set(key, check);
     check.catch((error: unknown) => {
-      if (!(error instanceof HostError && error.code === "permission_denied"))
-        grants.delete(key);
+      if (!(error instanceof HostError && error.code === "permission_denied")) grants.delete(key);
     });
     return check;
   };

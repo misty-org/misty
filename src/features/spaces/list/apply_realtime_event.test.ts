@@ -101,7 +101,10 @@ describe("applying realtime events", () => {
     const { get, set, scope } = harness(accountId, {});
 
     applyRealtimeEventSafely(
-      { ...event(71, "read.updated", { conversation_id: "group", seq: 2 }), actor_user_id: accountId },
+      {
+        ...event(71, "read.updated", { conversation_id: "group", seq: 2 }),
+        actor_user_id: accountId,
+      },
       accountId,
       get,
       set,

@@ -16,7 +16,9 @@ const room = vi.hoisted(() => ({
 vi.mock("./call_room", () => room);
 vi.mock("./call_support", () => ({ callEncryptionSupported: () => true }));
 const dms = vi.hoisted(() => ({
-  peekDm: vi.fn((id: string) => (id.startsWith("group") ? { id, kind: "group" } : { id, kind: "direct" })),
+  peekDm: vi.fn((id: string) =>
+    id.startsWith("group") ? { id, kind: "group" } : { id, kind: "direct" },
+  ),
 }));
 vi.mock("../direct_data", () => dms);
 
@@ -199,7 +201,9 @@ it("a ring that arrives while accepting another is answered busy once the call s
 });
 
 it("a key that can't be opened joins nothing", async () => {
-  keys.openRingKey.mockImplementationOnce(() => Promise.reject(new Error("OperationError")) as never);
+  keys.openRingKey.mockImplementationOnce(
+    () => Promise.reject(new Error("OperationError")) as never,
+  );
   useCallStore.getState().ring({ dmId: "dm_15", from: "ana", video: false, sealedKeys: {} });
   await useCallStore.getState().accept();
   expect(useCallStore.getState().active).toBeNull();

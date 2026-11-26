@@ -18,7 +18,9 @@ const nameField = () => screen.getByLabelText("Name") as HTMLInputElement;
 it("opens straight into the agent's New task conversation without a directory", () => {
   renderAgentsPage();
   expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
-  expect(screen.getByText(/^This is the beginning of your direct message history with /)).toBeTruthy();
+  expect(
+    screen.getByText(/^This is the beginning of your direct message history with /),
+  ).toBeTruthy();
   expect(screen.queryByRole("navigation", { name: "Agent workspace pages" })).toBeNull();
   expect(screen.getAllByRole("heading", { name: "Communications" }).length).toBeGreaterThan(0);
   expect(screen.queryByRole("button", { name: /^Switch agent/ })).toBeNull();

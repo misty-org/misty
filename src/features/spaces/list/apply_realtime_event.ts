@@ -21,10 +21,7 @@ import {
   reloadSpaceConversationsForMessage,
 } from "../chat/space_conversations_resource";
 import type { SpacesStore } from "./spaces_store_types";
-import {
-  spacesSnapshotLoadedSince,
-  spacesSnapshotReloadQueued,
-} from "./spaces_snapshot_freshness";
+import { spacesSnapshotLoadedSince, spacesSnapshotReloadQueued } from "./spaces_snapshot_freshness";
 import { spaceReadEvent } from "./spaces_resync";
 
 type SpacesSet = (

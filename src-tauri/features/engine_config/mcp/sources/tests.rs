@@ -190,7 +190,6 @@ fn grok_disabled_list_and_enabled_field_combine_for_both_scopes() {
     assert!(!source("grok_project").writable);
 }
 
-
 #[test]
 fn grok_toggle_updates_field_and_keeps_comments() {
     let scratch = Scratch::new("grok-write");

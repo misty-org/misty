@@ -22,7 +22,6 @@ import { HandOffDialog } from "./HandOffDialog";
 import { formatCost } from "../../context-panel/chat_usage";
 import { formatTokens, tookText } from "./meta/format";
 
-
 export function AgentMessageActions(props: {
   conversationId?: string;
   message: GlobalAiMessage;

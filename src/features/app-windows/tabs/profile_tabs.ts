@@ -140,10 +140,7 @@ export function startProfileTabs(): () => void {
       !state.side || !fields.side ? state.side : fields.side;
     const here = incoming.filter((tab) => sideOfTab(tab) === state.side);
     const leaving = (kept: typeof incoming) =>
-      new Set([
-        ...removed,
-        ...incoming.filter((tab) => !kept.includes(tab)).map(({ id }) => id),
-      ]);
+      new Set([...removed, ...incoming.filter((tab) => !kept.includes(tab)).map(({ id }) => id)]);
     const update: Partial<WorkspaceStore> = {
       layout: mergeTabs(state.layout, here, leaving(here)),
     };

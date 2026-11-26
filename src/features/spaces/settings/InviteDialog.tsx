@@ -61,7 +61,11 @@ function InviteBody({ space }: { space: Space }) {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    if (!members) void useSpacesStore.getState().loadMembers(space.id).catch(() => undefined);
+    if (!members)
+      void useSpacesStore
+        .getState()
+        .loadMembers(space.id)
+        .catch(() => undefined);
   }, [members, space.id]);
 
   const here = new Set((members ?? []).map((member) => member.user_id));

@@ -49,4 +49,3 @@ fn bypass_started_session_skips_set_mode() {
         ["--acp", "--permission-mode", "bypass_permissions"]
     );
 }
-

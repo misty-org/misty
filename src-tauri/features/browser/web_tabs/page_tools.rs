@@ -188,7 +188,10 @@ async fn web_archive(webview: &Webview) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
-pub fn browser_webview_inspect(app: AppHandle, request: BrowserWebTabRequest) -> Result<(), String> {
+pub fn browser_webview_inspect(
+    app: AppHandle,
+    request: BrowserWebTabRequest,
+) -> Result<(), String> {
     let webview = running(&app, &request.id)?;
     #[cfg(target_os = "macos")]
     return webview
@@ -266,7 +269,12 @@ pub async fn browser_webview_page_text(
     request: BrowserWebTabRequest,
 ) -> Result<BrowserPageText, String> {
     let webview = running(&app, &request.id)?;
-    let value = page_value(&webview, PAGE_TEXT_SCRIPT.to_owned(), Duration::from_secs(10)).await?;
+    let value = page_value(
+        &webview,
+        PAGE_TEXT_SCRIPT.to_owned(),
+        Duration::from_secs(10),
+    )
+    .await?;
     let mut page = serde_json::from_str::<String>(&value)
         .ok()
         .and_then(|text| serde_json::from_str::<BrowserPageText>(&text).ok())

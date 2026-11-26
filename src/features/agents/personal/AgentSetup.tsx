@@ -236,12 +236,7 @@ export function AgentSetup(props: {
         ) : (
           <span />
         )}
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          disabled={!draft.name.trim() || busy}
-        >
+        <Button type="submit" variant="primary" size="lg" disabled={!draft.name.trim() || busy}>
           {step === 2 ? "Create agent" : "Continue"}
         </Button>
       </div>

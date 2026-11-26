@@ -134,9 +134,7 @@ export const directApi = {
   myStatus: () => spaceRequest<ChosenStatus>("/me/status"),
   setMyStatus: (status: ChosenStatus, fields: readonly string[] = []) =>
     spaceRequest<ChosenStatus>(
-      fields.length
-        ? `/me/status?fields=${encodeURIComponent(fields.join(","))}`
-        : "/me/status",
+      fields.length ? `/me/status?fields=${encodeURIComponent(fields.join(","))}` : "/me/status",
       { method: "PUT", ...json(status) },
     ),
   statuses: () =>

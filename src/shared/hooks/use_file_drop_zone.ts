@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { usePointerDropTarget } from "@misty/ui";
-import {
-  draggedFiles,
-  draggedFilesScope,
-  readDraggedFiles,
-} from "@/shared/platform/dragged_files";
+import { draggedFiles, draggedFilesScope, readDraggedFiles } from "@/shared/platform/dragged_files";
 import { registerFileDropZone } from "@/shared/platform/native_file_drop";
 
 export const FILE_DROP_AREA_ATTRIBUTE = "data-file-drop-area";

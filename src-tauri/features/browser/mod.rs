@@ -193,8 +193,8 @@ pub mod pages;
 pub mod profiles;
 pub mod site_data;
 pub mod site_icons;
-#[cfg(desktop)]
-pub mod web_tabs;
 #[cfg(test)]
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
+#[cfg(desktop)]
+pub mod web_tabs;

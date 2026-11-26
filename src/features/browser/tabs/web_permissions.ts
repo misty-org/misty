@@ -38,8 +38,7 @@ export function dropPermissionAsks(page: string) {
 
 export function askedFor(kinds: SitePermissionKind[]): string {
   if (kinds.length === 1 && kinds[0] === "location") return "know your location";
-  const said =
-    kinds.length > 1 ? `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}` : kinds[0];
+  const said = kinds.length > 1 ? `${kinds.slice(0, -1).join(", ")} and ${kinds.at(-1)}` : kinds[0];
   return `use your ${said}`;
 }
 

@@ -32,13 +32,18 @@ export function runTabUse(request: LocalToolRequest, started: RunEntry) {
   const scopeId = typeof request.input.scopeId === "string" ? request.input.scopeId : "";
   const reason = typeof request.input.reason === "string" ? request.input.reason.trim() : "";
   const tab = webTabOfScope(scopeId);
-  if (!tab) throw invalidRequest("That tab isn't open. List the person's tabs with browser_tab_list.");
+  if (!tab)
+    throw invalidRequest("That tab isn't open. List the person's tabs with browser_tab_list.");
   return withRunLock(started.runId, async () => {
     const entry = await loadRunEntry(started.runId);
     const target = entry && sessionTarget(entry);
     if (!entry || !target) throw notAllowed();
     if (entry.contexts.some((item) => item.opaqueRef === scopeId))
-      return { status: "open", scopeId, message: `You're already working in this tab (scopeId ${scopeId}).` };
+      return {
+        status: "open",
+        scopeId,
+        message: `You're already working in this tab (scopeId ${scopeId}).`,
+      };
     if (!tab.viewId && !(await wakeWebTab(tab.id, tab.spaceId)))
       throw invalidRequest("That tab couldn't open its page. Ask the person to open it again.");
     const name = await computerName();

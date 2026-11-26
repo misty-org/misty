@@ -61,9 +61,9 @@ export function WebTabMenu(props: {
       .catch(() => setRecent([]));
   };
   const copy = () =>
-    void navigator.clipboard.writeText(props.url).catch(() =>
-      notify({ message: "The link couldn't be copied", tone: "error" }),
-    );
+    void navigator.clipboard
+      .writeText(props.url)
+      .catch(() => notify({ message: "The link couldn't be copied", tone: "error" }));
   const { confirm, dialog } = useConfirmDelete();
   const clearHistory = () =>
     void confirm({
@@ -80,66 +80,81 @@ export function WebTabMenu(props: {
     <>
       {dialog}
       <DropdownMenu onOpenChange={loadRecent}>
-      <MenuTrigger iconOnly icon={Ellipsis} label="More" />
-      <DropdownMenuContent align="end">
-        <MenuItem icon={TextSearch} label="Find on page" disabled={!props.live} onSelect={props.onFind} />
-        <MenuSubmenu icon={ZoomIn} label={`Zoom ${zoomText(props.zoom)}`} disabled={!props.live}>
-          <MenuRadioGroup
-            value={String(props.zoom)}
-            onValueChange={(value) => props.onZoom(Number(value))}
-          >
-            {zoomLevels.map((level) => (
-              <MenuRadioItem key={level} value={String(level)} label={zoomText(level)} />
-            ))}
-          </MenuRadioGroup>
-        </MenuSubmenu>
-        {props.onTranslate ? (
+        <MenuTrigger iconOnly icon={Ellipsis} label="More" />
+        <DropdownMenuContent align="end">
           <MenuItem
-            icon={Languages}
-            label="Translate page"
-            disabled={!props.live || !web}
-            onSelect={props.onTranslate}
+            icon={TextSearch}
+            label="Find on page"
+            disabled={!props.live}
+            onSelect={props.onFind}
           />
-        ) : null}
-        {props.onAnnotate ? (
-          <MenuItem
-            icon={SquarePen}
-            label="Annotate page"
-            disabled={!props.live || !web}
-            onSelect={props.onAnnotate}
-          />
-        ) : null}
-        <MenuItem
-          icon={PictureInPicture2}
-          label="Picture in picture"
-          disabled={!props.live}
-          onSelect={props.onPictureInPicture}
-        />
-        <MenuSeparator />
-        <MenuItem icon={Link} label="Copy link" disabled={!web} onSelect={copy} />
-        <MenuItem
-          icon={ExternalLink}
-          label="Open in default browser"
-          disabled={!web}
-          onSelect={() => void openExternalLink(props.url)}
-        />
-        <MenuItem icon={Save} label="Save page" disabled={!props.live || !web} onSelect={props.onSavePage} />
-        <MenuItem icon={Printer} label="Print" disabled={!props.live} onSelect={props.onPrint} />
-        <MenuItem icon={SquareCode} label="Web Inspector" disabled={!props.live} onSelect={props.onInspect} />
-        <MenuSeparator />
-        <MenuSubmenu icon={Clock} label="History">
-          {recent.map((page) => (
+          <MenuSubmenu icon={ZoomIn} label={`Zoom ${zoomText(props.zoom)}`} disabled={!props.live}>
+            <MenuRadioGroup
+              value={String(props.zoom)}
+              onValueChange={(value) => props.onZoom(Number(value))}
+            >
+              {zoomLevels.map((level) => (
+                <MenuRadioItem key={level} value={String(level)} label={zoomText(level)} />
+              ))}
+            </MenuRadioGroup>
+          </MenuSubmenu>
+          {props.onTranslate ? (
             <MenuItem
-              key={page.url}
-              label={pageLabel(page.url, page.title)}
-              onSelect={() => props.onGo(page.url)}
+              icon={Languages}
+              label="Translate page"
+              disabled={!props.live || !web}
+              onSelect={props.onTranslate}
             />
-          ))}
-          {recent.length ? <MenuSeparator /> : null}
-          <MenuItem icon={History} label="Show all history" onSelect={props.onShowHistory} />
-          <MenuItem icon={Trash2} label="Clear history" danger onSelect={clearHistory} />
-        </MenuSubmenu>
-      </DropdownMenuContent>
+          ) : null}
+          {props.onAnnotate ? (
+            <MenuItem
+              icon={SquarePen}
+              label="Annotate page"
+              disabled={!props.live || !web}
+              onSelect={props.onAnnotate}
+            />
+          ) : null}
+          <MenuItem
+            icon={PictureInPicture2}
+            label="Picture in picture"
+            disabled={!props.live}
+            onSelect={props.onPictureInPicture}
+          />
+          <MenuSeparator />
+          <MenuItem icon={Link} label="Copy link" disabled={!web} onSelect={copy} />
+          <MenuItem
+            icon={ExternalLink}
+            label="Open in default browser"
+            disabled={!web}
+            onSelect={() => void openExternalLink(props.url)}
+          />
+          <MenuItem
+            icon={Save}
+            label="Save page"
+            disabled={!props.live || !web}
+            onSelect={props.onSavePage}
+          />
+          <MenuItem icon={Printer} label="Print" disabled={!props.live} onSelect={props.onPrint} />
+          <MenuItem
+            icon={SquareCode}
+            label="Web Inspector"
+            disabled={!props.live}
+            onSelect={props.onInspect}
+          />
+          <MenuSeparator />
+          <MenuSubmenu icon={Clock} label="History">
+            {recent.map((page) => (
+              <MenuItem
+                key={page.url}
+                label={pageLabel(page.url, page.title)}
+                onSelect={() => props.onGo(page.url)}
+              />
+            ))}
+            {recent.length ? <MenuSeparator /> : null}
+            <MenuItem icon={History} label="Show all history" onSelect={props.onShowHistory} />
+            <MenuItem icon={Trash2} label="Clear history" danger onSelect={clearHistory} />
+          </MenuSubmenu>
+        </DropdownMenuContent>
       </DropdownMenu>
     </>
   );

@@ -37,4 +37,3 @@ pub struct HearingSpec {
 pub struct VadSpec {
     pub model: PathBuf,
 }
-

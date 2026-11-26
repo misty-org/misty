@@ -176,9 +176,7 @@ export function SearchPage({
         action={{ label: "Try again", icon: RefreshCw, variant: "secondary", onClick: retry }}
       />
     );
-  const apps = (
-    <AppsShelf spaceId={spaceId} query={term} limit={SHELF} quiet />
-  );
+  const apps = <AppsShelf spaceId={spaceId} query={term} limit={SHELF} quiet />;
   if (!hits)
     return (
       <>

@@ -87,37 +87,6 @@ fn is_active<R: Runtime>(window: &Window<R>) -> bool {
     unsafe { GetForegroundWindow() as isize == hwnd.0 as isize }
 }
 
-pub(crate) fn restore_page<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
-    let label = webview.label().to_owned();
-    let lost = lost_to_app().lock().is_ok_and(|lost| lost.contains(&label));
-    if !lost || !is_active(&webview.window()) {
-        return Ok(());
-    }
-    if let Ok(mut marked) = programmatic().lock() {
-        marked.insert(label.clone());
-    }
-    webview
-        .with_webview(move |platform| {
-            let controller = platform.controller();
-            let mut visible = Default::default();
-            // SAFETY: the controller is live during this UI-thread callback.
-            let shown = unsafe { controller.IsVisible(&mut visible) }.is_ok() && visible.as_bool();
-            if !shown {
-                if let Ok(mut marked) = programmatic().lock() {
-                    marked.remove(&label);
-                }
-                return;
-            }
-            if unsafe { controller.MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC) }.is_err()
-            {
-                if let Ok(mut marked) = programmatic().lock() {
-                    marked.remove(&label);
-                }
-            }
-        })
-        .map_err(|error| error.to_string())
-}
-
 pub(crate) fn forget(window: &str) {
     if let Ok(mut last) = last_focused().lock() {
         last.remove(window);

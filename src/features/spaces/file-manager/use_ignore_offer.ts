@@ -14,7 +14,10 @@ function markedBy(marker: string, item: FileItem): boolean {
   const name = folder ? marker.slice(0, -1) : marker;
   if (folder !== item.folder) return false;
   if (name.startsWith("*."))
-    return item.name.toLowerCase().endsWith(name.slice(1).toLowerCase()) && item.name.length > name.length - 1;
+    return (
+      item.name.toLowerCase().endsWith(name.slice(1).toLowerCase()) &&
+      item.name.length > name.length - 1
+    );
   return item.name === name;
 }
 
@@ -85,7 +88,9 @@ export function useIgnoreOffer(
   const mayEditRoot = useSpacesStore((store) => {
     const space = store.spaces.find((each) => each.id === spaceId);
     const held: readonly string[] = space?.permissions ?? [];
-    return space?.role === "owner" || held.includes("drive.purge") || held.includes("administrator");
+    return (
+      space?.role === "owner" || held.includes("drive.purge") || held.includes("administrator")
+    );
   });
   useEffect(() => {
     if (!on || !spaceId || !folder || !items?.length || !templates?.length) return;

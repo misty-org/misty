@@ -27,9 +27,7 @@ export function channelLayout(
     .filter((conversation) => conversation.kind !== "dm")
     .sort(byPosition);
   return {
-    loose: channels.filter(
-      (channel) => !channel.category_id || !known.has(channel.category_id),
-    ),
+    loose: channels.filter((channel) => !channel.category_id || !known.has(channel.category_id)),
     categories: [...categories].sort(byPosition).map((category) => ({
       category,
       channels: channels.filter((channel) => channel.category_id === category.id),

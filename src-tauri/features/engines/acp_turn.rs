@@ -522,9 +522,9 @@ fn answer_outcome(answers: Option<&Value>) -> Result<Value, String> {
     let Some(answers) = answers else {
         return Ok(json!({ "outcome": DISMISS_OUTCOME }));
     };
-    let map = answers.as_object().ok_or_else(|| {
-        "the answers must be an object keyed by the question text".to_string()
-    })?;
+    let map = answers
+        .as_object()
+        .ok_or_else(|| "the answers must be an object keyed by the question text".to_string())?;
     for (question, choice) in map {
         let is_label = matches!(choice, Value::String(_));
         let is_labels =

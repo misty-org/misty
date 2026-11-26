@@ -31,7 +31,8 @@ export function reloadFriends() {
 
 const peopleSeen = new Set<string>();
 
-const mutualFriendsPath = (userId: string) => `/people/${encodeURIComponent(userId)}/mutual-friends`;
+const mutualFriendsPath = (userId: string) =>
+  `/people/${encodeURIComponent(userId)}/mutual-friends`;
 const sharedSpacesPath = (userId: string) => `/people/${encodeURIComponent(userId)}/shared-spaces`;
 
 export function useMutualFriends(userId: string) {
@@ -156,8 +157,7 @@ export function useProfileUpdates(accountId: string | undefined) {
       });
     };
     const onSpace = (event: Event) => {
-      const detail = (event as CustomEvent<{ spaceId?: string } & Record<string, unknown>>)
-        .detail;
+      const detail = (event as CustomEvent<{ spaceId?: string } & Record<string, unknown>>).detail;
       const patch = profilePatch(detail);
       if (detail?.spaceId && patch) applySpaceProfile(detail.spaceId, patch);
     };

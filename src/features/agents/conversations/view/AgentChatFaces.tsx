@@ -28,7 +28,9 @@ export function YouFace({ you }: { you: ReturnType<typeof useYou> }) {
 }
 
 const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
 
 export function messageStamp(iso: string, now = new Date()) {
   const date = new Date(iso);

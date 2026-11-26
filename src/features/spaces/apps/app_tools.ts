@@ -90,7 +90,11 @@ export function offerAppTools(options: {
       handlers[appToolName(appId, tool.name)] = async ({ input, runId }) => {
         const agent = await callerOf(runId);
         try {
-          return await options.adapter!.command("adapter.call", { name: tool.name, args: input, agent });
+          return await options.adapter!.command("adapter.call", {
+            name: tool.name,
+            args: input,
+            agent,
+          });
         } catch (error) {
           if (error instanceof ScreenRefused)
             throw new LocalToolRejected("app_tool_failed", messageOf(error));

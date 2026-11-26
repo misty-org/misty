@@ -36,13 +36,7 @@ import {
 import { failureText } from "./explore_index";
 import { useExploreNav, type ExploreItem } from "./explore_view";
 
-export function ExploreManage({
-  item,
-  spaceId,
-}: {
-  item: ExploreItem;
-  spaceId: string;
-}) {
+export function ExploreManage({ item, spaceId }: { item: ExploreItem; spaceId: string }) {
   if (item.kind === "apps") return <AppManage spaceId={spaceId} id={item.id} />;
   if (item.kind === "engines") return <EngineManage id={item.id} />;
   if (item.kind === "hearing") return <SpeechManage id={item.id} />;

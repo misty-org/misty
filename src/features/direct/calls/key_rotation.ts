@@ -139,9 +139,7 @@ export const ranksBefore = (a: string, b: string) => a < b;
 const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 export function keeperOf<T extends { identity: string; sid: string }>(people: T[]): T | undefined {
-  return [...people].sort(
-    (a, b) => order(a.identity, b.identity) || order(a.sid, b.sid),
-  )[0];
+  return [...people].sort((a, b) => order(a.identity, b.identity) || order(a.sid, b.sid))[0];
 }
 
 export async function keyGroup(key: Uint8Array<ArrayBuffer>) {
@@ -334,8 +332,7 @@ export async function startKeyRotation(
   let latest = 0;
   let pending: number | undefined;
   let rotation:
-    | { epoch: number; waiting: Set<string>; abandoned: boolean; done(): void }
-    | undefined;
+    { epoch: number; waiting: Set<string>; abandoned: boolean; done(): void } | undefined;
   let rotating: Promise<void> | undefined;
   let again = false;
   let trust: Trust = room.remoteParticipants.size === 0 ? "trusted" : "none";
@@ -382,14 +379,14 @@ export async function startKeyRotation(
 
   const isKeyed = (person: Participant) =>
     person === self ? trusted() : person.attributes[keyedAttribute] === "1";
-  const sealable = () => [...room.remoteParticipants.values()].filter((person) => computerOf(person));
+  const sealable = () =>
+    [...room.remoteParticipants.values()].filter((person) => computerOf(person));
   const keeperNow = (except?: string): Participant | undefined =>
     keeperOf<Participant>([
       ...(trusted() ? [self] : []),
       ...sealable().filter((person) => person.identity !== except && isKeyed(person)),
     ]);
-  const keeping = (except?: string) =>
-    trusted() && keeperNow(except)?.identity === self.identity;
+  const keeping = (except?: string) => trusted() && keeperNow(except)?.identity === self.identity;
   const outranks = (identity: string) => trusted() && ranksBefore(self.identity, identity);
 
   const send = async (message: KeyMessage, to?: string[]) => {
@@ -550,7 +547,10 @@ export async function startKeyRotation(
       }, wait),
     );
   };
-  const welcomeSoon = (person: RemoteParticipant, computer: { keyId: string; publicKey: string }) => {
+  const welcomeSoon = (
+    person: RemoteParticipant,
+    computer: { keyId: string; publicKey: string },
+  ) => {
     const wait = settleWait(person);
     if (wait > 0) welcomeOnceSettled(person, computer, wait);
     else quietly(serial(() => welcome(person.identity, computer)));
@@ -800,7 +800,12 @@ export async function startKeyRotation(
     provider.addPerson(person.identity);
     later(person);
   };
-  const onData = (payload: Uint8Array, from?: RemoteParticipant, _kind?: unknown, topic?: string) => {
+  const onData = (
+    payload: Uint8Array,
+    from?: RemoteParticipant,
+    _kind?: unknown,
+    topic?: string,
+  ) => {
     if (topic !== keyTopic || !from || stopped) return;
     const message = parseKeyMessage(payload);
     if (message) quietly(serial(() => receive(message, from)));

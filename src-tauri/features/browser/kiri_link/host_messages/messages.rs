@@ -52,6 +52,7 @@ pub(super) struct BackgroundMessage {
     pub(super) token: String,
     pub(super) background: String,
     #[serde(default)]
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(super) bare: bool,
 }
 
@@ -86,6 +87,7 @@ pub(super) fn zoom_message(raw: &str) -> Option<ZoomMessage> {
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct CaretMessage {
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(super) token: String,
     pub(super) caret: Option<CaretRect>,
 }

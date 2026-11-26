@@ -172,6 +172,7 @@ pub(super) fn last_focused_person() -> Option<String> {
         .and_then(|state| state.last_focused.clone())
 }
 
+#[cfg(target_os = "macos")]
 pub(super) fn last_focused_any() -> Option<String> {
     LAST_FOCUSED.lock().ok().and_then(|last| last.clone())
 }

@@ -135,10 +135,9 @@ export function createScreenTools(options: {
       } catch (error) {
         if (error instanceof LocalToolRejected) throw error;
         const message = error instanceof Error ? error.message : String(error);
-        if (error instanceof ScreenRefused) throw new LocalToolRejected("app_screen_failed", message);
-        throw new Error(
-          `${message} It may or may not have happened; look before doing it again.`,
-        );
+        if (error instanceof ScreenRefused)
+          throw new LocalToolRejected("app_screen_failed", message);
+        throw new Error(`${message} It may or may not have happened; look before doing it again.`);
       }
     };
   const pointAt = (input: Record<string, unknown>): [number, number] => [

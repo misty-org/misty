@@ -3,6 +3,7 @@ import { createDeviceSetting } from "@/shared/lib/device_setting";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { savedInputDevice } from "@/features/voice";
+import { microphoneSettingsHint } from "@/shared/platform/desktop_os";
 
 export type CallDeviceKind = "audioinput" | "audiooutput" | "videoinput";
 
@@ -80,6 +81,18 @@ const fallbackName: Record<CallDeviceKind, string> = {
   audiooutput: "Speaker",
   videoinput: "Camera",
 };
+
+export function microphoneFailure(error: unknown, fallback: string): string {
+  console.warn("Call microphone failed", error);
+  const name = typeof error === "object" && error && "name" in error ? String(error.name) : "";
+  if (name === "NotAllowedError")
+    return `Misty isn’t allowed to use the microphone. ${microphoneSettingsHint()}`;
+  if (name === "NotFoundError" || name === "OverconstrainedError")
+    return "No microphone was found.";
+  if (name === "NotReadableError")
+    return "The microphone couldn’t be opened. Another app may be using it.";
+  return fallback;
+}
 
 export const canPickSpeaker = () =>
   typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;

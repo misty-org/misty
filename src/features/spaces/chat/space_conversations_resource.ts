@@ -71,7 +71,11 @@ export function markSpaceChatReadLocally(spaceId: string, conversationId: string
 const readReloadDelayMs = 1_000;
 const readReloadTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function applySpaceChatReadMarker(spaceId: string, conversationId: string, caughtUp: boolean) {
+export function applySpaceChatReadMarker(
+  spaceId: string,
+  conversationId: string,
+  caughtUp: boolean,
+) {
   if (caughtUp) return markSpaceChatReadLocally(spaceId, conversationId);
   if (readReloadTimers.has(spaceId)) return;
   readReloadTimers.set(

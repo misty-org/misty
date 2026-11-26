@@ -533,7 +533,9 @@ describe("call key rotation", () => {
     await until(() => b.rotation.latest === 1);
 
     await ana.localParticipant.setAttributes({ "misty.key-group": "elsewhere" });
-    await until(() => bo.remoteParticipants.get("ana")?.attributes["misty.key-group"] === "elsewhere");
+    await until(
+      () => bo.remoteParticipants.get("ana")?.attributes["misty.key-group"] === "elsewhere",
+    );
     await inject(ana, { kind: "use", index: 1, epoch: 1 }, ["bo"]);
     await pause(100);
     expect(b.rotation.epoch).toBe(0);

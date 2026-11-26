@@ -45,9 +45,10 @@ export function dropChannel(
       return position < 0 ? item : { ...item, category_id: categoryId, position };
     }),
   );
-  settle(spaceId, "The channel couldn't be moved. Try again.")(
-    spacesApi.placeConversation(spaceId, moving, categoryId, afterId),
-  );
+  settle(
+    spaceId,
+    "The channel couldn't be moved. Try again.",
+  )(spacesApi.placeConversation(spaceId, moving, categoryId, afterId));
 }
 
 export function dropCategory(
@@ -70,9 +71,10 @@ export function dropCategory(
       return position < 0 ? item : { ...item, position };
     }),
   );
-  settle(spaceId, "The category couldn't be moved. Try again.")(
-    spacesApi.updateCategory(spaceId, moving, { afterId }),
-  );
+  settle(
+    spaceId,
+    "The category couldn't be moved. Try again.",
+  )(spacesApi.updateCategory(spaceId, moving, { afterId }));
 }
 
 export function neighbour<T extends { id: string }>(items: T[], id: string, direction: -1 | 1) {

@@ -148,7 +148,9 @@ export function ChatPinnedList({
               name={message.sender_name}
               size="lg"
               src={
-                message.origin?.author_avatar_url || avatars.get(message.sender_user_id) || undefined
+                message.origin?.author_avatar_url ||
+                avatars.get(message.sender_user_id) ||
+                undefined
               }
               outline={memberOutlineFor(outlines, message)}
             />

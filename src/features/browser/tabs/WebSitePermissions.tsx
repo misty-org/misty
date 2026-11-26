@@ -40,7 +40,11 @@ export function WebPermissionAsk(props: { viewId: string }) {
         label="A site is asking"
         title={`${hostOf(ask.origin)} wants to ${askedFor(ask.kinds)}`}
         end={
-          <IconButton size="sm" label="Dismiss" onClick={() => answerPermission(ask.id, false, false)}>
+          <IconButton
+            size="sm"
+            label="Dismiss"
+            onClick={() => answerPermission(ask.id, false, false)}
+          >
             <X />
           </IconButton>
         }
@@ -88,7 +92,9 @@ export function WebSiteInfo(props: { url: string }) {
   const change = (kind: SitePermissionKind, value: string) => {
     const allow = value === "allow" ? true : value === "block" ? false : null;
     setPermissions((current) => ({ ...current, [kind]: allow ?? undefined }));
-    void setSitePermission(origin, kind, allow).catch(() => void readSitePermissions(origin).then(setPermissions));
+    void setSitePermission(origin, kind, allow).catch(
+      () => void readSitePermissions(origin).then(setPermissions),
+    );
   };
   return (
     <Popover onOpenChange={load}>

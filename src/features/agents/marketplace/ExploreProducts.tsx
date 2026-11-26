@@ -38,13 +38,7 @@ import {
   useListingAction,
 } from "./ListingRows";
 
-export function ExploreProduct({
-  item,
-  spaceId,
-}: {
-  item: ExploreItem;
-  spaceId: string;
-}) {
+export function ExploreProduct({ item, spaceId }: { item: ExploreItem; spaceId: string }) {
   if (item.kind === "apps") return <AppProduct spaceId={spaceId} id={item.id} />;
   if (item.kind === "engines") return <EngineProduct id={item.id} />;
   if (item.kind === "hearing") return <SpeechProduct id={item.id} />;

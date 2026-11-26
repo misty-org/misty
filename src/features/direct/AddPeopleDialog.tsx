@@ -84,8 +84,7 @@ export function AddPeopleDialog({
   }, [open, startWith]);
 
   const inDm = new Set((dm?.members ?? []).map((member) => member.user_id));
-  const online = (person: Person) =>
-    (statuses[person.user_id]?.status ?? "offline") !== "offline";
+  const online = (person: Person) => (statuses[person.user_id]?.status ?? "offline") !== "offline";
   const candidates = (friends.data?.friends ?? [])
     .filter((person) => !inDm.has(person.user_id))
     .sort((a, b) => Number(online(b)) - Number(online(a)) || a.username.localeCompare(b.username));
@@ -124,9 +123,7 @@ export function AddPeopleDialog({
 
   const list = () => {
     if (!friends.data && friends.loading)
-      return (
-        <ListRowSkeleton label="Loading friends" rows={6} leading lines={2} trailing="icon" />
-      );
+      return <ListRowSkeleton label="Loading friends" rows={6} leading lines={2} trailing="icon" />;
     if (!friends.data)
       return (
         <ErrorState

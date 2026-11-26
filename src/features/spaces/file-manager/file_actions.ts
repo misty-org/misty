@@ -25,13 +25,7 @@ import {
   type FileItem,
   type FilesPlace,
 } from "./model";
-import {
-  bySource,
-  failuresOf,
-  listDriveFolder,
-  sourceOf,
-  type FileSourceAdapter,
-} from "./sources";
+import { bySource, failuresOf, listDriveFolder, sourceOf, type FileSourceAdapter } from "./sources";
 import { diskSource } from "./sources/disk_source";
 import type { BrowserStore } from "./store/browser_store";
 import type { Run } from "./use_operations";

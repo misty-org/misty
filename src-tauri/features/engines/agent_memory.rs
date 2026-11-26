@@ -559,13 +559,7 @@ pub(crate) async fn forget_from_view(
         run: String::new(),
     };
     let drive = crate::spaces_drive::drive()?;
-    forget(
-        &drive,
-        &SpaceId(space.to_string()),
-        &place,
-        file,
-    )
-    .await?;
+    forget(&drive, &SpaceId(space.to_string()), &place, file).await?;
     index::refresh(store, space, agent).await
 }
 

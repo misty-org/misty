@@ -30,12 +30,7 @@ import {
   type HearingModelView,
   type InstallProgress,
 } from "../speech_models";
-import {
-  useVoicebox,
-  useVoiceboxProgress,
-  useVoiceboxVoices,
-  VOICEBOX_APP_ID,
-} from "../voicebox";
+import { useVoicebox, useVoiceboxProgress, useVoiceboxVoices, VOICEBOX_APP_ID } from "../voicebox";
 import { requestOpenExplore } from "@/shared/lib/open_explore";
 import { voiceSettings } from "../voice_settings";
 import { speechLanguages, voiceLabel, voiceSample } from "./speech_choices";

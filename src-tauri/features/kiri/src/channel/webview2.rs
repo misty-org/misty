@@ -67,7 +67,11 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
                 Ok(())
             }));
             let raw = core.as_raw() as usize;
-            if let Some(before) = listeners().lock().ok().and_then(|mut known| known.remove(&raw)) {
+            if let Some(before) = listeners()
+                .lock()
+                .ok()
+                .and_then(|mut known| known.remove(&raw))
+            {
                 let _ = core.remove_WebMessageReceived(before);
             }
             let mut token = 0i64;

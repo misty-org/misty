@@ -25,13 +25,7 @@ import {
   useCollectionDropPlaces,
 } from "@misty/ui";
 import { folderName, useProjectFolders } from "@/features/agents";
-import {
-  disk,
-  type Drive,
-  type FinderTag,
-  type FreeSpace,
-  type Places,
-} from "@/features/files";
+import { disk, type Drive, type FinderTag, type FreeSpace, type Places } from "@/features/files";
 import { SpaceDriveSection } from "../drive";
 import { formatBytes } from "./format";
 import { samePlace, type FilesPlace } from "./model";

@@ -5,7 +5,8 @@ use file_access::disk::fs_disk;
 const VOLUME_HOLDING: &str = ".misty-agent-trash";
 
 fn in_misty_holding(path: &Path) -> bool {
-    file_access::disk::agent_trash_folder().is_some_and(|folder| path.parent() == Some(folder.as_path()))
+    file_access::disk::agent_trash_folder()
+        .is_some_and(|folder| path.parent() == Some(folder.as_path()))
 }
 
 fn in_volume_holding(path: &Path) -> bool {
@@ -59,6 +60,8 @@ mod tests {
         assert!(in_volume_holding(Path::new(
             "/Volumes/USB/.misty-agent-trash/abc-a"
         )));
-        assert!(!in_volume_holding(Path::new("/Volumes/USB/elsewhere/abc-a")));
+        assert!(!in_volume_holding(Path::new(
+            "/Volumes/USB/elsewhere/abc-a"
+        )));
     }
 }

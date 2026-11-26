@@ -310,7 +310,12 @@ fn agent_documents(store: &Store, account: &str) -> Vec<Value> {
     read().unwrap_or_default()
 }
 
-pub(crate) fn account_site_granted(store: &Store, account: &str, agent: &str, origin: &str) -> bool {
+pub(crate) fn account_site_granted(
+    store: &Store,
+    account: &str,
+    agent: &str,
+    origin: &str,
+) -> bool {
     !account.is_empty()
         && !agent.is_empty()
         && origin.starts_with("https://")

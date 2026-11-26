@@ -72,10 +72,14 @@ fn show(app: &AppHandle<Wry>, total: u32) {
 #[cfg(windows)]
 const OVERLAY: u32 = 32;
 
+#[cfg(any(not(target_os = "macos"), test))]
 const FILL: [u8; 4] = [0xf5, 0xf5, 0xf4, 0xff];
+#[cfg(any(not(target_os = "macos"), test))]
 const EDGE: [u8; 4] = [0x5f, 0x63, 0x68, 0xff];
+#[cfg(any(not(target_os = "macos"), test))]
 const INK: [u8; 4] = [0x20, 0x21, 0x24, 0xff];
 
+#[cfg(any(not(target_os = "macos"), test))]
 const GLYPHS: [(char, [u8; 5]); 11] = [
     ('0', [0b111, 0b101, 0b101, 0b101, 0b111]),
     ('1', [0b010, 0b110, 0b010, 0b010, 0b111]),
@@ -90,6 +94,7 @@ const GLYPHS: [(char, [u8; 5]); 11] = [
     ('+', [0b000, 0b010, 0b111, 0b010, 0b000]),
 ];
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn glyph(c: char) -> Option<[u8; 5]> {
     GLYPHS
         .iter()
@@ -97,6 +102,7 @@ fn glyph(c: char) -> Option<[u8; 5]> {
         .map(|(_, rows)| *rows)
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn put(pixels: &mut [u8], size: u32, x: i64, y: i64, color: [u8; 4]) {
     if x < 0 || y < 0 || x >= i64::from(size) || y >= i64::from(size) {
         return;
@@ -105,6 +111,7 @@ fn put(pixels: &mut [u8], size: u32, x: i64, y: i64, color: [u8; 4]) {
     pixels[at..at + 4].copy_from_slice(&color);
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn in_pill(x: f64, y: f64, left: f64, top: f64, width: f64, height: f64) -> bool {
     let radius = height / 2.0;
     let middle = top + radius;
@@ -115,6 +122,7 @@ fn in_pill(x: f64, y: f64, left: f64, top: f64, width: f64, height: f64) -> bool
     dx * dx + dy * dy <= radius * radius
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 /// Draws a count bubble (its text a few digits or "99+") at the bottom right of a square RGBA
 /// picture `size` wide: a light pill with a dark edge and dark digits, `height` tall.
 pub(crate) fn draw_bubble(pixels: &mut [u8], size: u32, text: &str, height: u32) {

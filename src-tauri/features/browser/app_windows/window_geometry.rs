@@ -29,11 +29,13 @@ type Measured = (Rect, bool, bool);
 
 struct Tracker {
     measure: std::sync::Arc<dyn Fn() -> Option<Measured> + Send + Sync>,
+    #[cfg(target_os = "macos")]
     flags: std::sync::Arc<dyn Fn((bool, bool)) + Send + Sync>,
     window_id: String,
     state: SavedGeometry,
     dirty: bool,
     last_change: Instant,
+    #[cfg(target_os = "macos")]
     pending: Option<(bool, bool)>,
 }
 
@@ -149,12 +151,10 @@ pub(crate) fn apply_and_track<R: Runtime>(window: &Window<R>, window_id: &str) {
     };
     let _ = place(window, rect);
     let wanted = (resolution.maximized, resolution.fullscreen);
-    let pending = if cfg!(target_os = "macos") {
-        (wanted != (false, false)).then_some(wanted)
-    } else {
-        apply_flags(window, wanted);
-        None
-    };
+    #[cfg(target_os = "macos")]
+    let pending = (wanted != (false, false)).then_some(wanted);
+    #[cfg(not(target_os = "macos"))]
+    apply_flags(window, wanted);
     let initial = saved
         .filter(|state| state.is_plausible())
         .map(|state| SavedGeometry {
@@ -171,6 +171,7 @@ pub(crate) fn apply_and_track<R: Runtime>(window: &Window<R>, window_id: &str) {
             fullscreen: false,
         });
     let measured = window.clone();
+    #[cfg(target_os = "macos")]
     let flagged = window.clone();
     trackers().insert(
         window.label().to_owned(),
@@ -182,11 +183,13 @@ pub(crate) fn apply_and_track<R: Runtime>(window: &Window<R>, window_id: &str) {
                     measured.is_fullscreen().unwrap_or(false),
                 ))
             }),
+            #[cfg(target_os = "macos")]
             flags: std::sync::Arc::new(move |wanted| apply_flags(&flagged, wanted)),
             window_id: window_id.to_owned(),
             state: initial,
             dirty: false,
             last_change: Instant::now(),
+            #[cfg(target_os = "macos")]
             pending,
         },
     );
@@ -201,6 +204,7 @@ fn apply_flags<R: Runtime>(window: &Window<R>, (maximized, fullscreen): (bool, b
     }
 }
 
+#[cfg(target_os = "macos")]
 pub(crate) fn shown(label: &str) {
     let job = {
         let mut trackers = trackers();

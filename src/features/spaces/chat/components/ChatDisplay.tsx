@@ -109,10 +109,7 @@ export function memberOutlineFor(
   return outlines.get(message.sender_user_id);
 }
 
-export function useMemberOutlines(
-  spaceId: string,
-  messages: SpaceMessage[],
-): Map<string, string> {
+export function useMemberOutlines(spaceId: string, messages: SpaceMessage[]): Map<string, string> {
   const members = useSpacesStore((state) => state.membersBySpace[spaceId]);
   return useMemo(() => {
     const outlines = new Map<string, string>();

@@ -291,6 +291,7 @@ fn hermes_wrappers_for_mistys_checkout_are_mistys_and_go_with_remove() {
     assert!(!root.engine_dir("hermes").exists());
 }
 
+#[cfg(unix)]
 fn homes(home: &Scratch) -> super::uninstall::Homes {
     super::uninstall::Homes {
         home: home.dir.clone(),

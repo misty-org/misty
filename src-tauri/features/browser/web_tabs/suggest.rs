@@ -141,8 +141,12 @@ mod tests {
         assert_eq!(
             parse(body, "mist"),
             vec![
-                SearchSuggestion::Query { text: "Misty".into() },
-                SearchSuggestion::Query { text: "misty step".into() }
+                SearchSuggestion::Query {
+                    text: "Misty".into()
+                },
+                SearchSuggestion::Query {
+                    text: "misty step".into()
+                }
             ]
         );
         assert!(parse(b"<html>", "mist").is_empty());
@@ -154,7 +158,9 @@ mod tests {
         assert_eq!(
             parse(body, "leet"),
             vec![
-                SearchSuggestion::Query { text: "leetcode".into() },
+                SearchSuggestion::Query {
+                    text: "leetcode".into()
+                },
                 SearchSuggestion::Site {
                     text: "LeetCode".into(),
                     url: "https://leetcode.com/".into()

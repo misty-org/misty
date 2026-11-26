@@ -391,7 +391,10 @@ export function createAppPageLink(mount: string): AppPageLink {
     if (lane === SDK_LANE && frame.t === "req")
       return queue(
         {
-          frame: [lane, { t: "res", id: frame.id, ok: false, error: { code: "internal", message } }],
+          frame: [
+            lane,
+            { t: "res", id: frame.id, ok: false, error: { code: "internal", message } },
+          ],
         },
         at,
       );

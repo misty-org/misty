@@ -51,7 +51,10 @@ function rank(
   tabs.forEach((tab) => tab.kind === "tab" && seen.add(tab.url));
   const best = history.find((row) => startsHost(typed, row.url));
   const lead: Suggestion[] = best
-    ? [{ kind: "history", ...best }, { kind: "go", text: typed }]
+    ? [
+        { kind: "history", ...best },
+        { kind: "go", text: typed },
+      ]
     : [{ kind: "go", text: typed }];
   if (best) seen.add(best.url);
   const visited = history
@@ -175,7 +178,8 @@ export function WebAddressField(props: {
       event.preventDefault();
       const suggestion = suggestions[active];
       if (suggestion) pick(suggestion, event.metaKey || event.ctrlKey);
-      else if (draft?.trim()) pick({ kind: "go", text: draft.trim() }, event.metaKey || event.ctrlKey);
+      else if (draft?.trim())
+        pick({ kind: "go", text: draft.trim() }, event.metaKey || event.ctrlKey);
     } else if (event.key === "Delete" || (event.key === "Backspace" && event.shiftKey)) {
       const suggestion = suggestions[active];
       if (suggestion?.kind !== "history" || !event.shiftKey) return;

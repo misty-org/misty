@@ -24,8 +24,8 @@ pub(crate) use agent_servers::agent_servers;
 #[path = "mcp_tools.rs"]
 mod tools;
 
-pub(crate) use tools::{is_misty_wire_name, names_misty_tool};
 use tools::*;
+pub(crate) use tools::{is_misty_wire_name, names_misty_tool};
 
 const CATALOG: &str = include_str!("../agents/runs/local_prompt/catalog.json");
 

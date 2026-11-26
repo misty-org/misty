@@ -1,6 +1,8 @@
 #[cfg(target_os = "macos")]
 pub mod app_menu;
 pub mod autostart;
+#[cfg(desktop)]
+pub mod badge;
 pub mod commands;
 pub(crate) mod crash_log;
 pub mod dropped_files;
@@ -18,8 +20,6 @@ pub mod runtime;
 pub mod settings_commands;
 pub(crate) mod setup;
 pub(crate) mod shell_plugins;
-#[cfg(desktop)]
-pub mod badge;
 #[cfg(desktop)]
 pub mod tray;
 #[cfg(target_os = "macos")]

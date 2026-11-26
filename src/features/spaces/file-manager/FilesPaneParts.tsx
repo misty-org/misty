@@ -209,11 +209,7 @@ export const PaneToolbar = memo(function PaneToolbar({
   );
 });
 
-export const PaneSidebar = memo(function PaneSidebar({
-  shown,
-}: {
-  shown: Map<string, FileItem>;
-}) {
+export const PaneSidebar = memo(function PaneSidebar({ shown }: { shown: Map<string, FileItem> }) {
   const { store, granted, pick, actions } = usePane();
   const picking = Boolean(pick);
   const choices = useFilesChoices(picking);

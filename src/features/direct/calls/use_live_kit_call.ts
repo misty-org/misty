@@ -27,6 +27,7 @@ import {
   savedCallAudio,
   savedCallDevice,
   savedNoiseReduction,
+  microphoneFailure,
   type CallDeviceKind,
 } from "./call_devices";
 import { CallSignals, type CallCaption, type CallReaction, type SignalsView } from "./call_signals";
@@ -199,9 +200,9 @@ const removedFor = (room: Room) => room.localParticipant.attributes[removedAttri
 const fullRoom = (error: unknown) =>
   Boolean(
     error &&
-      typeof error === "object" &&
-      ((error as { code?: unknown }).code === "room_full" ||
-        (error instanceof Error && /max participants|room is full/i.test(error.message))),
+    typeof error === "object" &&
+    ((error as { code?: unknown }).code === "room_full" ||
+      (error instanceof Error && /max participants|room is full/i.test(error.message))),
   );
 
 function receiveQuality(room: Room, quality: VideoQuality) {
@@ -529,10 +530,13 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         }
         if (!quiet) {
           micWanted.current = true;
-          await settleMic(room, false).catch(() => {
+          await settleMic(room, false).catch((error: unknown) => {
             if (!cancelled)
               notify({
-                message: "Your microphone couldn’t be turned on, so you joined muted.",
+                message: microphoneFailure(
+                  error,
+                  "Your microphone couldn’t be turned on, so you joined muted.",
+                ),
                 tone: "error",
               });
           });
@@ -685,8 +689,11 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         set: (on) => {
           micWanted.current = on;
           savedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
-          void settleMic(room).catch(() =>
-            notify({ message: "The microphone couldn’t be turned on.", tone: "error" }),
+          void settleMic(room).catch((error: unknown) =>
+            notify({
+              message: microphoneFailure(error, "The microphone couldn’t be turned on."),
+              tone: "error",
+            }),
           );
         },
       },
@@ -777,8 +784,11 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         : !room.localParticipant.isMicrophoneEnabled;
       savedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
       micWanted.current = on;
-      void settleMic(room).catch(() =>
-        notify({ message: "The microphone couldn’t be turned on.", tone: "error" }),
+      void settleMic(room).catch((error: unknown) =>
+        notify({
+          message: microphoneFailure(error, "The microphone couldn’t be turned on."),
+          tone: "error",
+        }),
       );
     },
     toggleCamera: () =>

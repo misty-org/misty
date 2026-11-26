@@ -793,29 +793,31 @@ fn parse_content_block_delta(
 }
 
 fn streamed_path(json: &str) -> Option<String> {
-    ["file_path", "notebook_path", "path"].iter().find_map(|key| {
-        let at = json.find(&format!("\"{key}\""))? + key.len() + 2;
-        let rest = json[at..]
-            .trim_start()
-            .strip_prefix(':')?
-            .trim_start()
-            .strip_prefix('"')?;
-        let mut escaped = false;
-        let (end, _) = rest.char_indices().find(|&(_, c)| {
-            if escaped {
-                escaped = false;
-                false
-            } else if c == '\\' {
-                escaped = true;
-                false
-            } else {
-                c == '"'
-            }
-        })?;
-        let path: String = serde_json::from_str(&format!("\"{}\"", &rest[..end])).ok()?;
-        let path = path.trim();
-        (!path.is_empty()).then(|| path.to_string())
-    })
+    ["file_path", "notebook_path", "path"]
+        .iter()
+        .find_map(|key| {
+            let at = json.find(&format!("\"{key}\""))? + key.len() + 2;
+            let rest = json[at..]
+                .trim_start()
+                .strip_prefix(':')?
+                .trim_start()
+                .strip_prefix('"')?;
+            let mut escaped = false;
+            let (end, _) = rest.char_indices().find(|&(_, c)| {
+                if escaped {
+                    escaped = false;
+                    false
+                } else if c == '\\' {
+                    escaped = true;
+                    false
+                } else {
+                    c == '"'
+                }
+            })?;
+            let path: String = serde_json::from_str(&format!("\"{}\"", &rest[..end])).ok()?;
+            let path = path.trim();
+            (!path.is_empty()).then(|| path.to_string())
+        })
 }
 
 fn parse_content_block_start(
@@ -1386,7 +1388,10 @@ mod tests {
                 path, args, patch, ..
             } => {
                 assert_eq!(path.as_deref(), Some("src/a b.ts"));
-                assert_eq!(args, &Some(serde_json::json!({ "file_path": "src/a b.ts" })));
+                assert_eq!(
+                    args,
+                    &Some(serde_json::json!({ "file_path": "src/a b.ts" }))
+                );
                 assert!(*patch);
             }
             _ => panic!("expected the path patch"),

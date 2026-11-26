@@ -104,7 +104,9 @@ impl ServerProgram {
         if !plain_name(&self.program) {
             return Err("The catalog's server name isn't a plain file name.".into());
         }
-        let placeholder = |arg: &String| !arg.contains('{') || matches!(arg.as_str(), "{port}" | "{data}" | "{parent}");
+        let placeholder = |arg: &String| {
+            !arg.contains('{') || matches!(arg.as_str(), "{port}" | "{data}" | "{parent}")
+        };
         if self.args.len() > 24
             || self
                 .args
@@ -124,8 +126,8 @@ impl ServerProgram {
     }
 
     fn build(&self, upstream_prefix: &str) -> Result<&Build, String> {
-        let platform =
-            platform().ok_or_else(|| "This app's server doesn't run on this computer.".to_owned())?;
+        let platform = platform()
+            .ok_or_else(|| "This app's server doesn't run on this computer.".to_owned())?;
         let build = self
             .builds
             .get(platform)
@@ -136,7 +138,9 @@ impl ServerProgram {
             || build.sha256.len() != 64
             || build.size > MAX_SERVER_ARCHIVE_BYTES
         {
-            return Err("The catalog's build of the app's server isn't the maker's own release.".into());
+            return Err(
+                "The catalog's build of the app's server isn't the maker's own release.".into(),
+            );
         }
         Ok(build)
     }
@@ -175,7 +179,10 @@ fn pinned_in(catalog: &str, app_id: &str) -> Result<Pinned, String> {
         .ok_or_else(|| "The app has no server of its own.".to_owned())?;
     spec.validate()?;
     let build = spec
-        .build(&format!("https://github.com/{}/releases/download/", app.upstream))?
+        .build(&format!(
+            "https://github.com/{}/releases/download/",
+            app.upstream
+        ))?
         .clone();
     Ok(Pinned {
         app_id: app.id,
@@ -247,7 +254,8 @@ pub async fn install(app: &AppHandle, app_id: &str) -> Result<PathBuf, String> {
         .ok_or_else(|| "Misty has no folder for the app's server.".to_owned())?
         .to_path_buf();
     let root = home()?.join("app-servers");
-    fs::create_dir_all(&root).map_err(|error| format!("Couldn't make a folder for the app's server: {error}"))?;
+    fs::create_dir_all(&root)
+        .map_err(|error| format!("Couldn't make a folder for the app's server: {error}"))?;
     let archive = root.join(format!(".download-{}", uuid::Uuid::new_v4()));
     let result = async {
         download_to(app, &pinned, &archive).await?;
@@ -258,10 +266,12 @@ pub async fn install(app: &AppHandle, app_id: &str) -> Result<PathBuf, String> {
             pinned.spec.program.clone(),
             pinned.build.url.ends_with(".tar.gz"),
         );
-        let extracted = tokio::task::spawn_blocking(move || extract(&archive_path, &staged_path, &program, tar))
-            .await
-            .map_err(|error| error.to_string())
-            .and_then(|done| done);
+        let extracted = tokio::task::spawn_blocking(move || {
+            extract(&archive_path, &staged_path, &program, tar)
+        })
+        .await
+        .map_err(|error| error.to_string())
+        .and_then(|done| done);
         if let Err(error) = extracted {
             let _ = fs::remove_file(&staged);
             return Err(error);
@@ -285,7 +295,8 @@ pub async fn install(app: &AppHandle, app_id: &str) -> Result<PathBuf, String> {
 }
 
 async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<(), String> {
-    let parsed = url::Url::parse(&pinned.build.url).map_err(|_| "That isn't an address.".to_owned())?;
+    let parsed =
+        url::Url::parse(&pinned.build.url).map_err(|_| "That isn't an address.".to_owned())?;
     if parsed.scheme() != "https" {
         return Err("Apps download only over https.".into());
     }
@@ -295,10 +306,14 @@ async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<
         .read_timeout(DOWNLOAD_STALL)
         .build()
         .map_err(|error| error.to_string())?;
-    let failed = || "Couldn't download the app's server. Check your connection and try again.".to_owned();
+    let failed =
+        || "Couldn't download the app's server. Check your connection and try again.".to_owned();
     let mut response = request_from(&client, &parsed, 0).await.ok_or_else(failed)?;
     let total = pinned.build.size;
-    if response.content_length().is_some_and(|length| length > MAX_SERVER_ARCHIVE_BYTES) {
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_SERVER_ARCHIVE_BYTES)
+    {
         return Err("The app's server is larger than Misty downloads.".into());
     }
     let mut file = std::fs::File::create(target)
@@ -313,7 +328,9 @@ async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<
             Ok(None) if total == 0 || received >= total => break,
             Ok(None) | Err(_) if resumed < DOWNLOAD_RESUMES && received > 0 => {
                 resumed += 1;
-                response = request_from(&client, &parsed, received).await.ok_or_else(failed)?;
+                response = request_from(&client, &parsed, received)
+                    .await
+                    .ok_or_else(failed)?;
                 continue;
             }
             Ok(None) | Err(_) => return Err(failed()),
@@ -344,12 +361,19 @@ async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<
         .sha256
         .eq_ignore_ascii_case(&hex::encode(hasher.finalize()))
     {
-        return Err("The downloaded server doesn't match the catalog's checksum, so it wasn't installed.".into());
+        return Err(
+            "The downloaded server doesn't match the catalog's checksum, so it wasn't installed."
+                .into(),
+        );
     }
     Ok(())
 }
 
-async fn request_from(client: &reqwest::Client, url: &url::Url, from: u64) -> Option<reqwest::Response> {
+async fn request_from(
+    client: &reqwest::Client,
+    url: &url::Url,
+    from: u64,
+) -> Option<reqwest::Response> {
     let mut request = client.get(url.clone());
     if from > 0 {
         request = request.header(reqwest::header::RANGE, format!("bytes={from}-"));
@@ -374,7 +398,8 @@ fn extract(archive: &Path, target: &Path, name: &str, tar: bool) -> Result<(), S
     let file = std::fs::File::open(archive).map_err(|_| damaged())?;
     let mut found = false;
     if tar {
-        let mut entries = tar::Archive::new(flate2::read::GzDecoder::new(std::io::BufReader::new(file)));
+        let mut entries =
+            tar::Archive::new(flate2::read::GzDecoder::new(std::io::BufReader::new(file)));
         for entry in entries.entries().map_err(|_| damaged())? {
             let entry = entry.map_err(|_| damaged())?;
             let path = entry.path().map_err(|_| damaged())?.into_owned();
@@ -399,7 +424,12 @@ fn extract(archive: &Path, target: &Path, name: &str, tar: bool) -> Result<(), S
         let mut index = None;
         for at in 0..zip.len() {
             let entry = zip.by_index(at).map_err(|_| damaged())?;
-            let last = entry.name().trim_end_matches('/').rsplit('/').next().unwrap_or("");
+            let last = entry
+                .name()
+                .trim_end_matches('/')
+                .rsplit('/')
+                .next()
+                .unwrap_or("");
             if last != name || entry.is_dir() {
                 continue;
             }
@@ -561,8 +591,14 @@ async fn start(pinned: &Pinned, program: &Path) -> Result<Running, String> {
     let (ready_tx, ready_rx) = oneshot::channel::<()>();
     let ready_tx = Arc::new(StdMutex::new(Some(ready_tx)));
     for stream in [
-        child.stdout.take().map(|out| Box::new(out) as Box<dyn AsyncRead + Send + Unpin>),
-        child.stderr.take().map(|err| Box::new(err) as Box<dyn AsyncRead + Send + Unpin>),
+        child
+            .stdout
+            .take()
+            .map(|out| Box::new(out) as Box<dyn AsyncRead + Send + Unpin>),
+        child
+            .stderr
+            .take()
+            .map(|err| Box::new(err) as Box<dyn AsyncRead + Send + Unpin>),
     ]
     .into_iter()
     .flatten()
@@ -572,7 +608,11 @@ async fn start(pinned: &Pinned, program: &Path) -> Result<Running, String> {
             let mut lines = BufReader::new(stream).lines();
             while let Ok(Some(line)) = lines.next_line().await {
                 if line.contains(&ready) {
-                    if let Some(tx) = ready_tx.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take() {
+                    if let Some(tx) = ready_tx
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .take()
+                    {
                         let _ = tx.send(());
                     }
                 }
@@ -715,7 +755,16 @@ mod tests {
         if platform().is_none() {
             return;
         }
-        let good = server(serde_json::json!(["--host", "127.0.0.1", "--port", "{port}", "--data-dir", "{data}", "--parent-pid", "{parent}"]));
+        let good = server(serde_json::json!([
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "{port}",
+            "--data-dir",
+            "{data}",
+            "--parent-pid",
+            "{parent}"
+        ]));
         assert!(pinned_in(&catalog(good), "voicebox").is_ok());
         let unknown = server(serde_json::json!(["--port", "{port}", "--home", "{home}"]));
         assert!(pinned_in(&catalog(unknown), "voicebox").is_err());

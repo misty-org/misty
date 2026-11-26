@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
-import {
-  disk,
-  type FinderTag,
-  type FreeSpace,
-  type Places,
-} from "@/features/files";
+import { disk, type FinderTag, type FreeSpace, type Places } from "@/features/files";
 
 interface PlacesStore {
   places: Places | null;

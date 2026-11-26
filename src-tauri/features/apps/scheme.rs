@@ -335,7 +335,10 @@ async fn serve(
             body = with_tag(&body, SCREEN_TAG);
             if manifest.server {
                 let up = "../".repeat(manifest.entry.matches('/').count());
-                body = with_tag(&body, &format!(r#"<script src="{up}{SERVER_FILE}"></script>"#));
+                body = with_tag(
+                    &body,
+                    &format!(r#"<script src="{up}{SERVER_FILE}"></script>"#),
+                );
             }
         }
         let hosts: Vec<String> = manifest

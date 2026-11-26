@@ -1,9 +1,7 @@
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use space_drive::{
-    DriveEntry, DriveStatus, EntryPage, ItemId, SpaceId, Version,
-};
+use space_drive::{DriveEntry, DriveStatus, EntryPage, ItemId, SpaceId, Version};
 use tauri::{AppHandle, Webview};
 
 use super::{drive, error_text, SpaceRef};
@@ -377,10 +375,7 @@ pub async fn drive_trash_many(
     let mut failures = Vec::new();
     for path in paths {
         let result = match node_id(&space, &path) {
-            Ok(id) => drive
-                .trash_now(&space, &id)
-                .await
-                .map_err(error_text),
+            Ok(id) => drive.trash_now(&space, &id).await.map_err(error_text),
             Err(error) => Err(error),
         };
         if let Err(error) = result {
@@ -496,7 +491,6 @@ pub async fn drive_purge(
     let space = space_of(&space_id)?;
     let id = item_of(&item_id)?;
     drive()?.purge(&space, &id).await.map_err(error_text)
-
 }
 
 #[tauri::command]
