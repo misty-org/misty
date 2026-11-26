@@ -6,7 +6,6 @@ import {
   FramedBar,
   FramedPage,
   PageStage,
-  SetupState,
   notify,
 } from "@misty/ui";
 import { useBrowserRuntimeStore, useWorkspaceViewTitle } from "@/features/app-windows";
@@ -273,11 +272,11 @@ export function WebTabPage(props: WebTabPageProps) {
               line={failure.offline ? "Check your connection, then try again." : failure.message}
               action={{ label: "Try again", onClick: () => reload(tabId) }}
             />
-          ) : wanted && !viewId ? (
-            <SetupState
-              tool="browser"
-              error={failed ? "The page couldn't open." : undefined}
-              onRetry={() => setAttempt((value) => value + 1)}
+          ) : failed && !viewId ? (
+            <ErrorState
+              title="This page couldn't open"
+              line="Something went wrong opening it."
+              action={{ label: "Try again", onClick: () => setAttempt((value) => value + 1) }}
             />
           ) : null}
         </PageStage>

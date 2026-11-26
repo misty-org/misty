@@ -15,7 +15,7 @@ import {
   whenPageHostShown,
   type PageBox,
 } from "./page_prewarm";
-import { webAddress } from "./web_address";
+import { webAddress, webHomeUrl } from "./web_address";
 import { addPermissionAsk, answerPermission, type WebPermissionAsk } from "./web_permissions";
 import {
   dropWebTab,
@@ -47,6 +47,56 @@ const web = (url: unknown): url is string => typeof url === "string" && /^https?
 const pending = new Map<string, Promise<boolean>>();
 let following = false;
 
+type SparePage = {
+  viewId: string;
+  ready: boolean;
+  title: string;
+  faviconUrl?: string;
+  loading: boolean;
+};
+let spare: SparePage | null = null;
+
+export function prepareSparePage() {
+  if (spare || !hasTauriInternals()) return;
+  followPages();
+  const page: SparePage = {
+    viewId: `page-${crypto.randomUUID()}`,
+    ready: false,
+    title: "",
+    loading: true,
+  };
+  spare = page;
+  const turn = prewarmTurn();
+  void turn.ready
+    .then(() => openPage(page.viewId, `web-scope-spare-${page.viewId}`, webHomeUrl, "", null))
+    .then((open) => {
+      if (spare === page && open) page.ready = true;
+      else if (spare === page) spare = null;
+      else if (open) closePage(page.viewId);
+    })
+    .finally(() => turn.release());
+}
+
+function takeSparePage(): SparePage | null {
+  if (!spare?.ready) return null;
+  const page = spare;
+  spare = null;
+  return page;
+}
+
+const sparePage = (viewId: string) => (spare?.viewId === viewId ? spare : null);
+
+function dropSparePage() {
+  const page = spare;
+  spare = null;
+  if (page?.ready) closePage(page.viewId);
+}
+
+function closePage(viewId: string) {
+  setBrowserRuntimeKeepLive(viewId, false);
+  void invoke("browser_webview_close", { request: { id: viewId } }).catch(() => undefined);
+}
+
 async function refreshNav(id: string) {
   const tab = webTab(id);
   if (!tab?.viewId) return;
@@ -64,6 +114,8 @@ function followPages() {
     listen<{ id: string; url: string; phase: "started" | "finished" | "navigated" }>(
       "misty://browser-page",
       ({ payload }) => {
+        const waiting = sparePage(payload.id);
+        if (waiting && payload.phase !== "navigated") waiting.loading = payload.phase === "started";
         const tab = webTabOfView(payload.id);
         if (!tab) return;
         const url = web(payload.url) ? payload.url : undefined;
@@ -84,6 +136,7 @@ function followPages() {
     listen<{ id: string; url: string; offline: boolean; message: string }>(
       "misty://browser-page-failed",
       ({ payload }) => {
+        if (sparePage(payload.id)) dropSparePage();
         const tab = webTabOfView(payload.id);
         if (!tab) return;
         const url = web(payload.url) ? payload.url : tab.url;
@@ -99,12 +152,16 @@ function followPages() {
       else answerPermission(payload.id, false, false);
     }),
     listen<{ id: string }>("misty://browser-stopped", ({ payload }) => {
+      const waiting = sparePage(payload.id);
+      if (waiting) waiting.loading = false;
       const tab = webTabOfView(payload.id);
       if (tab) updateWebTab(tab.id, { loading: false });
     }),
     listen<{ id: string; title: string }>("misty://browser-title", ({ payload }) => {
       const tab = webTabOfView(payload.id);
       const title = payload.title.trim();
+      const waiting = sparePage(payload.id);
+      if (waiting && title) waiting.title = title;
       if (!tab || !title) return;
       updateWebTab(tab.id, { title });
       if (web(tab.url))
@@ -113,6 +170,8 @@ function followPages() {
         );
     }),
     listen<{ id: string; url: string }>("misty://browser-favicon", ({ payload }) => {
+      const waiting = sparePage(payload.id);
+      if (waiting && web(payload.url)) waiting.faviconUrl = payload.url;
       const tab = webTabOfView(payload.id);
       if (tab && web(payload.url)) updateWebTab(tab.id, { faviconUrl: payload.url });
     }),
@@ -128,6 +187,7 @@ async function openPage(
   url: string,
   spaceId: string,
   shown: PageBox | null,
+  host?: HTMLElement | null,
 ) {
   try {
     await invoke("browser_webview_create", {
@@ -140,7 +200,8 @@ async function openPage(
         ...(shown ?? shownPageSize()),
       },
     });
-    if (!shown) await invoke("browser_webview_hide", { request: { id: viewId, keepLive: true } });
+    if (!shown || (host !== undefined && !shownPageBox(host)))
+      await invoke("browser_webview_hide", { request: { id: viewId, keepLive: true } });
   } catch {
     await invoke("browser_webview_close", { request: { id: viewId } }).catch(() => undefined);
     return false;
@@ -170,9 +231,13 @@ export function wakeWebTab(
       const current = webTab(id);
       if (!current) return false;
       if (current.viewId) return true;
-      const viewId = `page-${crypto.randomUUID()}`;
       const url = current.url || browserHomeUrl();
-      if (!(await openPage(viewId, current.scopeId, url, spaceId, shownPageBox(host))))
+      const page = takeSparePage();
+      prepareSparePage();
+      if (page && (await adoptSparePage(page, id, current.scopeId, url, spaceId, host)))
+        return true;
+      const viewId = `page-${crypto.randomUUID()}`;
+      if (!(await openPage(viewId, current.scopeId, url, spaceId, shownPageBox(host), host ?? null)))
         return false;
       updateWebTab(id, { viewId, spaceId, zoom: 1 });
       return true;
@@ -182,6 +247,32 @@ export function wakeWebTab(
   })().finally(() => pending.delete(id));
   pending.set(id, work);
   return work;
+}
+
+async function adoptSparePage(
+  page: SparePage,
+  id: string,
+  scopeId: string,
+  url: string,
+  spaceId: string,
+  host?: HTMLElement | null,
+) {
+  if (!(await openPage(page.viewId, scopeId, url, spaceId, shownPageBox(host), host ?? null)))
+    return false;
+  const home = url === webHomeUrl;
+  updateWebTab(id, {
+    viewId: page.viewId,
+    spaceId,
+    zoom: 1,
+    loading: home ? page.loading : true,
+    ...(home && page.title && { title: page.title }),
+    ...(home && page.faviconUrl && { faviconUrl: page.faviconUrl }),
+  });
+  if (!home)
+    await invoke("browser_webview_navigate", { request: { id: page.viewId, url } }).catch(() =>
+      updateWebTab(id, { loading: false }),
+    );
+  return true;
 }
 
 export async function goTo(id: string, typed: string, spaceId: string) {

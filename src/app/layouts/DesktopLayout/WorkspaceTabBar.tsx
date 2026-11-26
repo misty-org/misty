@@ -1,4 +1,3 @@
-import { Plus } from "lucide-react";
 import { useState } from "react";
 import {
   activeLayoutView,
@@ -11,7 +10,6 @@ import {
   type WorkspaceView,
 } from "@/features/app-windows";
 import {
-  IconButton,
   RenameItemDialog,
   TabStrip,
   windowToolbarClass,
@@ -21,7 +19,7 @@ import {
 import { setPageMuted, usePageMedia, type PlayingPage } from "@/features/browser";
 import { usePlayingSources } from "./page_media_views";
 import { GroupMenu, TabMenu } from "./WorkspaceTabMenus";
-import { openNewTab } from "./space_navigation";
+import { NewTabMenu } from "./NewTabMenu";
 import { WorkspaceTabIcon } from "./WorkspaceTabIcon";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
@@ -125,11 +123,7 @@ export function WorkspaceTabBar(props: {
         onDropOnTab={(id, target) => store().groupTabWith(id, target)}
         onDropOnGroup={(id, group) => store().addTabToGroup(id, group)}
         onMoveGroup={(group, before) => store().moveTabGroup(group, before)}
-        after={
-          <IconButton label="New tab" onClick={() => openNewTab(props.onOpen)}>
-            <Plus />
-          </IconButton>
-        }
+        after={<NewTabMenu onOpen={props.onOpen} />}
         end={
           props.captionSlot ? (
             <div id={windowsCaptionSlotId} className="flex items-center" />

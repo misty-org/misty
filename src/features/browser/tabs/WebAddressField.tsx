@@ -94,12 +94,13 @@ export function WebAddressField(props: {
   const { tabId, url, onGo, onOpenBeside, onSwitchTab } = props;
   const input = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [remote, setRemote] = useState<SearchSuggestion[]>([]);
   const [selected, setSelected] = useState(0);
   const tabs = useWebTabs((state) => state.tabs);
   const shown = web(url) ? url : "";
-  const typed = draft?.trim() ?? "";
+  const typed = asking ? (draft?.trim() ?? "") : "";
 
   useEffect(() => {
     if (props.autoFocus) input.current?.focus();
@@ -135,6 +136,7 @@ export function WebAddressField(props: {
 
   const finish = () => {
     setDraft(null);
+    setAsking(false);
     setSelected(0);
     input.current?.blur();
   };
@@ -173,6 +175,7 @@ export function WebAddressField(props: {
       event.preventDefault();
       const suggestion = suggestions[active];
       if (suggestion) pick(suggestion, event.metaKey || event.ctrlKey);
+      else if (draft?.trim()) pick({ kind: "go", text: draft.trim() }, event.metaKey || event.ctrlKey);
     } else if (event.key === "Delete" || (event.key === "Backspace" && event.shiftKey)) {
       const suggestion = suggestions[active];
       if (suggestion?.kind !== "history" || !event.shiftKey) return;
@@ -198,10 +201,12 @@ export function WebAddressField(props: {
         }}
         onBlur={() => {
           setDraft(null);
+          setAsking(false);
           setSelected(0);
         }}
         onChange={(event) => {
           setDraft(event.target.value);
+          setAsking(true);
           setSelected(0);
         }}
         onKeyDown={onKeyDown}
