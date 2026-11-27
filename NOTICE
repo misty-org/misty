@@ -308,3 +308,78 @@ Excalidraw (https://github.com/excalidraw/excalidraw)
   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+wry and tao (https://github.com/tauri-apps/wry, https://github.com/tauri-apps/tao)
+  Dependencies of harness/crates/host, under Apache-2.0 or MIT. The host's window and event loop follow
+  wry's `simple` example.
+
+browser-use (https://github.com/browser-use/browser-use)
+  harness/crates/page-runtime/js/page_effects.js follows browser-use's browser_use/ax.py: the effect probe
+  (a token per document and a filtered count of DOM mutations and form events) and the compact
+  page state (new controls marked with *, the start and end of a long page kept). Under the MIT
+  license:
+
+    MIT License
+
+    Copyright (c) 2024 Gregor Zunic
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+page-agent (https://github.com/alibaba/page-agent)
+  harness/crates/page-runtime/js follows page-agent's page-controller, itself derived in part from
+  browser-use's DOM tree script: in page_tree.js the cursors that mark a control, popup toggles
+  and mouse-handler attributes as clickable, scrollable areas found by their scrollbar style and
+  reported with how far they still scroll, controls listed inside a link or card when they act
+  on their own, the field facts on a line (input kind, placeholder hint, date format, popup kind,
+  new tab, component state) and the page position; in page_actions.js scrolling an app shell's
+  main area when the document can't scroll, and the script click's innermost target, focus and
+  pointer leaving the last target. Under the MIT license:
+
+    MIT License
+
+    Copyright (c) 2026 SimonLuvRamen
+    Copyright (c) 2026 Alibaba Group Holding Limited
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+BU Bench (https://github.com/browser-use/benchmark)
+  harness/benchmarks/bu-bench/browser-use-benchmark is a git submodule: this repository records which
+  BU Bench commit to use (v2.1.1) and includes none of its files. harness/benchmarks/bu-bench/misty_eval.py
+  imports BU Bench's code from that checkout (task loading, selection, the findings judge, scoring
+  and summaries); none of that code is copied here. Its evidence layout and the task prompt follow
+  BU Bench's BrowserCode runner.
+  The BU Bench repository states no license of its own; its README asks that decrypted
+  tasks and rubrics are never published or used for training, and this repository keeps run data
+  out of version control.

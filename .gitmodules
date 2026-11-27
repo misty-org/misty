@@ -1,0 +1,3 @@
+[submodule "harness/benchmarks/bu-bench/browser-use-benchmark"]
+	path = harness/benchmarks/bu-bench/browser-use-benchmark
+	url = https://github.com/browser-use/benchmark.git
