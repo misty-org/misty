@@ -49,7 +49,7 @@ export function openControl(id: "model" | "mode") {
   return done(
     id === "model"
       ? "Choose the model from ⋯ in the composer"
-      : "Choose the mode from ⋯ in the composer",
+      : "Type /permissions and a mode, such as Plan",
   );
 }
 

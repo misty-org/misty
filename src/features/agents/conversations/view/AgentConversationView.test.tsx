@@ -29,7 +29,7 @@ function conversation(messages: GlobalAiMessage[]) {
   return { id: "conversation", messages } as unknown as GlobalAiConversation;
 }
 
-it("marks where Misty's summarized notes end", () => {
+it("marks where Misty's summarized notes end", async () => {
   render(
     <AgentConversationView
       working={false}
@@ -43,7 +43,7 @@ it("marks where Misty's summarized notes end", () => {
     />,
   );
   const divider = screen.getByRole("separator", { name: "Earlier messages summarized" });
-  const before = screen.getByText("Here is the plan.");
+  const before = await screen.findByText("Here is the plan.");
   const after = screen.getByText("Move it to Friday");
   expect(before.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(divider.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

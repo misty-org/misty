@@ -7,6 +7,7 @@ import {
   ListOrdered,
   SquarePen,
   SquareTerminal,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -17,20 +18,20 @@ import {
   isBrowserOpen,
   useAgentBrowser,
 } from "../agent-browser/agent_browser_store";
-import { SessionGoalButton } from "../goals/SessionGoalButton";
 import { useSidePanelShown } from "./ChatSidePanels";
 import { toggleChatBrowser } from "../tabs/agent_person_tabs";
 import { chatKey } from "../conversations/state/draft_chat";
 import { useContextPanel, type ContextPanelTab } from "./context_panel_store";
 import { useRailLayout, type RailItemId } from "./rail_layout_store";
-import { useSearchParams } from "react-router-dom";
 
 const panels: [ContextPanelTab, string, LucideIcon][] = [
+  ["goal", "Goal", Target],
   ["session", "Session", GaugeCircle],
   ["steps", "Steps", ListOrdered],
   ["changes", "Changes", GitCompareArrows],
   ["files", "Files", FolderTree],
   ["terminal", "Terminal", SquareTerminal],
+  ["memory", "Memory", BookOpenText],
 ];
 
 export function ContextRail(props: {
@@ -38,7 +39,6 @@ export function ContextRail(props: {
   disabled: boolean;
   onNewTask(): void;
 }) {
-  const [, setParams] = useSearchParams();
   const open = useContextPanel((state) => state.tab);
   const session = useContextPanel((state) => state.session);
   const toggle = useContextPanel((state) => state.toggle);
@@ -67,25 +67,6 @@ export function ContextRail(props: {
           onClick={props.onNewTask}
         >
           <SquarePen />
-        </IconButton>
-      ),
-    },
-    goal: { label: "Goal", node: <SessionGoalButton conversationId={chat} /> },
-    memory: {
-      label: "Memory",
-      node: (
-        <IconButton
-          label="Memory"
-          tooltipSide="left"
-          onClick={() =>
-            setParams((current) => {
-              const next = new URLSearchParams(current);
-              next.set("view", "memory");
-              return next;
-            })
-          }
-        >
-          <BookOpenText />
         </IconButton>
       ),
     },

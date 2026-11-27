@@ -1,10 +1,10 @@
 import { DesktopSettingsRow as SettingsRow } from "@/features/settings";
 import { DropdownControl } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settings_types";
-import { savedInputDevice, useInputDevices } from "../input_device";
+import { useSavedInputDevice, useInputDevices } from "../input_device";
 
 export function MicrophoneRow(props: SettingsContentProps) {
-  const chosen = savedInputDevice((state) => state.value);
+  const chosen = useSavedInputDevice((state) => state.value);
   const { devices } = useInputDevices();
   const options = [
     { value: "", label: "System default" },
@@ -16,7 +16,7 @@ export function MicrophoneRow(props: SettingsContentProps) {
         value={options.some((item) => item.value === chosen) ? chosen : ""}
         options={options}
         disabled={props.working}
-        onValueChange={(value) => savedInputDevice.getState().set(value)}
+        onValueChange={(value) => useSavedInputDevice.getState().set(value)}
       />
     </SettingsRow>
   );

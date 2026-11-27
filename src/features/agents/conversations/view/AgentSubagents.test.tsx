@@ -41,7 +41,7 @@ it("shows the notebook's findings open, without the agent's checklist", async ()
     />,
   );
   expect(screen.queryByText("Find prices")).toBeNull();
-  expect(screen.getByText(/Acme costs \$12/)).toBeTruthy();
+  expect(await screen.findByText(/Acme costs \$12/)).toBeTruthy();
   expect(screen.getByText("Also saved as a note in your personal Space.")).toBeTruthy();
   const toggle = screen.getByRole("button", { name: /Notebook/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("true");

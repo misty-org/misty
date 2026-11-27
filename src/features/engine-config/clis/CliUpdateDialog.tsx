@@ -17,7 +17,6 @@ import {
   DialogTitle,
   DisclosureButton,
   PaneLoading,
-  Spinner,
   Text,
   DialogFooter,
 } from "@misty/ui";
@@ -63,7 +62,7 @@ export function CliUpdateDialog({
           ) : confirming && state.plan ? (
             <PlanSummary plan={state.plan} />
           ) : (
-            <RunStatus engine={engine} state={state} starting={autoStart} />
+            <RunStatus engine={engine} state={state} />
           )}
           {!confirming && state.plan ? <RunDetails state={state} /> : null}
         </div>
@@ -73,15 +72,7 @@ export function CliUpdateDialog({
   );
 }
 
-function RunStatus({
-  engine,
-  state,
-  starting,
-}: {
-  engine: string;
-  state: CliUpdateFlowState;
-  starting: boolean;
-}) {
+function RunStatus({ engine, state }: { engine: string; state: CliUpdateFlowState }) {
   const name = engineName(engine);
   const running = state.status === "running";
   const [slow, setSlow] = useState(false);
@@ -118,14 +109,9 @@ function RunStatus({
   } else {
     line = `Downloading ${name} from its maker and setting it up. This takes a minute or two.`;
   }
-  const busy = running || state.status === "planning" || starting;
   return (
     <div className="flex items-start gap-3" role={state.status === "error" ? "alert" : "status"}>
-      {busy ? (
-        <Spinner className="mt-0.5 shrink-0" />
-      ) : state.status === "done" ? (
-        <Check aria-hidden="true" className="mt-0.5 shrink-0" />
-      ) : null}
+      {state.status === "done" ? <Check aria-hidden="true" className="mt-0.5 shrink-0" /> : null}
       <Text size="body" wrap>
         {line}
       </Text>

@@ -1,7 +1,8 @@
 import { Smile, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMyPresence, useStatusStore, type ChosenStatus } from "@/features/direct";
 import { useDoNotDisturb } from "@/shared/lib/do_not_disturb";
+import { reactionPicker } from "@/shared/lib/reaction_picker";
 import {
   Button,
   Dialog,
@@ -11,8 +12,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Emoji,
   Field,
+  IconButton,
   Input,
+  Label,
   MenuItem,
   MenuRadioGroup,
   MenuRadioItem,
@@ -94,6 +98,7 @@ function CustomStatusForm(props: { onClose(): void }) {
   const [text, setText] = useState(() => useStatusStore.getState().mine.custom_text ?? "");
   const [expiry, setExpiry] = useState("never");
   const [saving, setSaving] = useState(false);
+  const textId = useId();
   const submit = async () => {
     setSaving(true);
     const done = await save({
@@ -119,22 +124,19 @@ function CustomStatusForm(props: { onClose(): void }) {
             void submit();
           }}
         >
-          <div className="flex items-end gap-2">
-            <Field label="Emoji" className="w-16">
+          <div className="grid gap-1.5">
+            <Label htmlFor={textId}>Status</Label>
+            <div className="flex items-center gap-2">
+              <StatusEmojiButton emoji={emoji.trim()} onSelect={setEmoji} />
               <Input
-                value={emoji}
-                maxLength={8}
-                onChange={(event) => setEmoji(event.target.value)}
-              />
-            </Field>
-            <Field label="Status" className="min-w-0 flex-1">
-              <Input
+                id={textId}
+                className="min-w-0 flex-1"
                 value={text}
                 maxLength={128}
                 placeholder="What's happening?"
                 onChange={(event) => setText(event.target.value)}
               />
-            </Field>
+            </div>
           </div>
           <Field label="Clear after">
             <OptionSelect value={expiry} options={expiries} onValueChange={setExpiry} />
@@ -151,6 +153,16 @@ function CustomStatusForm(props: { onClose(): void }) {
       </DialogFooter>
     </DialogContent>
   );
+}
+
+function StatusEmojiButton(props: { emoji: string; onSelect(emoji: string): void }) {
+  const Picker = reactionPicker();
+  const button = (
+    <IconButton label={props.emoji ? "Change emoji" : "Choose emoji"} disabled={!Picker}>
+      {props.emoji ? <Emoji emoji={props.emoji} /> : <Smile />}
+    </IconButton>
+  );
+  return Picker ? <Picker onSelect={props.onSelect}>{button}</Picker> : button;
 }
 
 export function useMyShownPresence(): MemberPresence {

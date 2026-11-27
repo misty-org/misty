@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useState } from "react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, useNotice, Field, Input, Surface, Text, Textarea } from "@misty/ui";
+import { Button, Field, Input, notify, Surface, Text, Textarea, useNotice } from "@misty/ui";
 import { exportBotBundle } from "./bot_bundle";
 import {
   assembleAgentPrompt,
@@ -118,7 +118,10 @@ export function ExportBotButton({ agent }: { agent: AgentProfile }) {
           setState("working");
           setError("");
           exportBotBundle(agent)
-            .then((folder) => setState(folder ? "done" : "idle"))
+            .then((folder) => {
+              setState(folder ? "done" : "idle");
+              if (folder) notify({ message: `Exported to ${folder}` });
+            })
             .catch((reason) => {
               setState("idle");
               setError(String(reason));

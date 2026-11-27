@@ -18,7 +18,7 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
   conversation?: GlobalAiConversation;
   agent?: AgentProfile;
   working: boolean;
-  onRetry: (prompt: string, fromMessageId?: string) => void;
+  onRetry: (prompt: string) => void;
   onResume?: (messageId: string, rows: LedgerRow[], only?: string[]) => void;
   onLedgerChange?: (messageId: string, rows: LedgerRow[]) => void;
   onEdit?: (text: string) => void;
@@ -79,7 +79,6 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
                   message={turn.answer}
                   steps={turn.steps}
                   retryPrompt={turn.prompt?.content}
-                  retryFrom={turn.prompt?.id}
                   {...handlers}
                 />
               )}

@@ -39,6 +39,12 @@ function targetOf(operation: string, input: Record<string, unknown>): string {
       return text(input.text) || text(input.textGone) || text(input.urlIncludes);
     case "browser.act":
       return text(input.goal).slice(0, 160);
+    case "browser.network":
+      return text(input.filter);
+    case "browser.storage":
+      return [text(input.store) || "cookies", text(input.action) || "list", text(input.name)]
+        .filter(Boolean)
+        .join(" ");
     case "browser.skill":
       return [text(input.skill), text(input.action)].filter(Boolean).join(".");
     default:

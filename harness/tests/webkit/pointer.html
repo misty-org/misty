@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Pointer</title>
+<style>
+  body { margin: 0; font: 14px sans-serif; }
+  #canvas { position: absolute; left: 0; top: 0; width: 400px; height: 200px; background: #eee; }
+  #hold { position: absolute; left: 420px; top: 20px; width: 120px; height: 40px; }
+  #box { position: absolute; left: 420px; top: 80px; width: 150px; height: 100px; overflow: auto; }
+  #box div { height: 1000px; }
+  #card { position: absolute; left: 20px; top: 240px; width: 100px; height: 40px; background: #cde; }
+  #lane { position: absolute; left: 300px; top: 230px; width: 200px; height: 80px; background: #dec; }
+  #knob { position: absolute; left: 20px; top: 340px; width: 30px; height: 30px; background: #888; }
+  #drop { position: absolute; left: 300px; top: 340px; width: 200px; height: 60px; background: #fdd; }
+</style>
+</head>
+<body>
+  <canvas id="canvas" width="400" height="200"></canvas>
+  <button id="hold">Hold me</button>
+  <div id="box" aria-label="Scroll box"><div>Long</div></div>
+  <div id="card" draggable="true">Card</div>
+  <div id="lane" role="region" aria-label="Done lane">Done</div>
+  <div id="knob" role="slider" aria-label="Volume" aria-valuenow="0" tabindex="0"></div>
+  <div id="drop" role="region" aria-label="Drop files here">Drop files here</div>
+  <p id="out" style="position:absolute; top: 420px">idle</p>
+  <script>
+    const out = (text) => { document.getElementById("out").textContent = text; };
+    const canvas = document.getElementById("canvas");
+    canvas.addEventListener("click", (event) => out(`canvas ${event.offsetX},${event.offsetY}`));
+    canvas.addEventListener("dblclick", (event) => out(`double ${event.offsetX},${event.offsetY}`));
+    canvas.addEventListener("contextmenu", (event) => { event.preventDefault(); out("context menu"); });
+    const hold = document.getElementById("hold");
+    hold.addEventListener("mousedown", () => out("held"));
+    hold.addEventListener("mouseup", () => out("released"));
+    const card = document.getElementById("card");
+    card.addEventListener("dragstart", (event) => event.dataTransfer.setData("text/plain", "card"));
+    const lane = document.getElementById("lane");
+    lane.addEventListener("dragover", (event) => event.preventDefault());
+    lane.addEventListener("drop", (event) => { event.preventDefault(); lane.textContent = "Done: " + (event.dataTransfer.getData("text/plain") || "card"); });
+    const knob = document.getElementById("knob");
+    let dragging = false;
+    knob.addEventListener("pointerdown", () => { dragging = true; });
+    window.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+      knob.style.left = Math.max(0, event.clientX - 15) + "px";
+      knob.setAttribute("aria-valuenow", String(Math.round(event.clientX)));
+    });
+    window.addEventListener("pointerup", () => { dragging = false; });
+    const drop = document.getElementById("drop");
+    drop.addEventListener("dragover", (event) => event.preventDefault());
+    drop.addEventListener("drop", (event) => { event.preventDefault(); out("dropped " + [...event.dataTransfer.files].map((f) => f.name).join(",")); });
+  </script>
+</body>
+</html>

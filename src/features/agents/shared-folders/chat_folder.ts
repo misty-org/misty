@@ -148,11 +148,16 @@ export const useChatFolders = create<ChatFoldersState>((set, get) => {
         return;
       }
       const id = conversationId!;
-      const path = await invoke<string>("chat_folder_scratch", {
+      const folder = await invoke<ChatFolder>("chat_folder_scratch", {
         account: account(),
         conversation: id,
       });
-      keep(id, { path, kind: "scratch" });
+      keep(id, folder);
+      const projectChats = get().projectChats;
+      if (projectChats?.[id]) {
+        const { [id]: _left, ...rest } = projectChats;
+        set({ projectChats: rest });
+      }
     },
     async forgetProject(path) {
       await invoke<void>("project_folder_forget", { account: account(), path });

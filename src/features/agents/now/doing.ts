@@ -22,6 +22,7 @@ const toolWords: [prefix: string, words: string, code: string][] = [
   ["image.", "Editing an image in the Space", "space"],
   ["thread.", "Posting in the Space", "space"],
   ["message.", "Posting in the Space", "space"],
+  ["mcp__misty__app_", "Working in an app", "app"],
   ["mcp__misty__", "Working in the Space", "space"],
   ["screen.", "Using the computer", "computer"],
   ["apps.", "Using a connected app", "app"],

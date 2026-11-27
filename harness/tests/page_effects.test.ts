@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import roles from "../crates/page-runtime/js/vendor_playwright_roles.js?raw";
 import core from "../crates/page-runtime/js/page_core.js?raw";
 import tree from "../crates/page-runtime/js/page_tree.js?raw";
 import actions from "../crates/page-runtime/js/page_actions.js?raw";
@@ -16,7 +17,8 @@ const globals = globalThis as unknown as { __mistyAgentPageV1?: Page };
 function load(html: string): Page {
   document.body.innerHTML = html;
   delete globals.__mistyAgentPageV1;
-  new Function(`${core}\n${tree}\n${actions}\n${consequence}\n${read}\n${skills}\n${effects}`)();
+  new Function(`${roles}
+${core}\n${tree}\n${actions}\n${consequence}\n${read}\n${skills}\n${effects}`)();
   return globals.__mistyAgentPageV1!;
 }
 

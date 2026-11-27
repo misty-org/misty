@@ -107,17 +107,6 @@ export function ChatEmojiPicker(props: {
   );
 }
 
-export function useQuickEmoji(count: number): string[] {
-  const frequent = useFrequentEmoji((state) => state.value);
-  return useMemo(
-    () =>
-      [...frequent, "👍", "👌", "🎉", "❤️"]
-        .filter((emoji, index, all) => all.indexOf(emoji) === index)
-        .slice(0, count),
-    [frequent, count],
-  );
-}
-
 export function isJumbo(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length > 60) return false;

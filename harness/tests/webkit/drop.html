@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Drop</title></head>
+<body>
+  <div id="zone" role="region" aria-label="Drop here" style="width:300px;height:120px;border:1px solid">Drop here</div>
+  <p id="got"></p>
+  <script>
+    const zone = document.getElementById("zone");
+    zone.addEventListener("dragover", (event) => event.preventDefault());
+    zone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      document.getElementById("got").textContent = "Got " + event.dataTransfer.getData("text/plain") + " | " + (event.dataTransfer.getData("text/uri-list") || "no link");
+    });
+  </script>
+</body></html>

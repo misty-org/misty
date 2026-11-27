@@ -6,6 +6,7 @@ import { useMistyStore } from "../../../conversations/state/use_misty_store";
 import { useChatFolder } from "../../../shared-folders/chat_folder";
 import { agentAccountId } from "../../../personal/agent_account";
 import { resolveChatFileLink } from "./file_link_resolution";
+import { notify } from "@misty/ui";
 
 export function useReplyFolder(): string {
   const conversationId = useMistyStore((state) => state.activeConversationId);
@@ -22,10 +23,13 @@ export function openChatFilePath(rawPath: string, folder: string): void {
 
 export function revealChatFilePath(rawPath: string, folder: string): void {
   void resolveChatFileLink(rawPath, folder).then((path) => {
-    if (path)
-      void invoke("project_reveal_path", { account: agentAccountId(), path }).catch(
-        () => undefined,
-      );
+    if (!path) {
+      notify({ message: "Couldn't find that file. It may have moved.", tone: "error" });
+      return;
+    }
+    void invoke("project_reveal_path", { account: agentAccountId(), path }).catch(() =>
+      notify({ message: "Couldn't show the file. It may have moved.", tone: "error" }),
+    );
   });
 }
 
@@ -33,6 +37,9 @@ export function copyChatFilePath(rawPath: string, folder: string): void {
   void resolveChatFileLink(rawPath, folder).then((path) => {
     const value = path ?? rawPath;
     const link = value.startsWith("/") ? `file://${encodeURI(value)}` : value;
-    void navigator.clipboard.writeText(link).catch(() => undefined);
+    void navigator.clipboard.writeText(link).then(
+      () => notify({ message: "Path copied" }),
+      () => notify({ message: "Couldn't copy the path.", tone: "error" }),
+    );
   });
 }

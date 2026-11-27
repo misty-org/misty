@@ -5,27 +5,29 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const personalAgents = vi.hoisted(() => ({
+  agents: [
+    {
+      id: "misty",
+      name: "Misty",
+      role: "",
+      instructions: "",
+      avatar: {},
+      model_mode: "automatic",
+      model_id: "",
+      enabled: true,
+      system_managed: true,
+    },
+  ],
+  loading: false,
+  error: "",
+  load: async () => {},
+}));
+
 vi.mock("../personal/personal_agents_store", () => ({
   defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
     agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
-  usePersonalAgentsStore: () => ({
-    agents: [
-      {
-        id: "misty",
-        name: "Misty",
-        role: "",
-        instructions: "",
-        avatar: {},
-        model_mode: "automatic",
-        model_id: "",
-        enabled: true,
-        system_managed: true,
-      },
-    ],
-    loading: false,
-    error: "",
-    load: async () => {},
-  }),
+  usePersonalAgentsStore: Object.assign(() => personalAgents, { getState: () => personalAgents }),
 }));
 
 vi.mock("../agents_runtime", async (original) => ({

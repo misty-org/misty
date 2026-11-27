@@ -1,0 +1,281 @@
+{
+  "page": "pointer.html",
+  "run": [
+    {
+      "name": "the page reads",
+      "op": "snapshot",
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "click a point on the canvas",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click_at",
+            "x": 120,
+            "y": 80
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the canvas got the point",
+      "op": "page",
+      "js": "return document.getElementById('out').textContent",
+      "expect": "canvas 120,80"
+    },
+    {
+      "name": "double click",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click_at",
+            "x": 50,
+            "y": 60,
+            "clickCount": 2
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the canvas got the double click",
+      "op": "page",
+      "js": "return document.getElementById('out').textContent",
+      "expect": "double 50,60"
+    },
+    {
+      "name": "right click",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click_at",
+            "x": 50,
+            "y": 60,
+            "button": "right"
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the canvas got the context menu",
+      "op": "page",
+      "js": "return document.getElementById('out').textContent",
+      "expect": "context menu"
+    },
+    {
+      "name": "a point outside the view is refused",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click_at",
+            "x": 99999,
+            "y": 5
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": false,
+            "errorCode": "browser_point_outside"
+          }
+        ]
+      }
+    },
+    {
+      "name": "press and hold",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "mouse_down",
+            "x": 480,
+            "y": 40
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "it is held",
+      "op": "page",
+      "js": "return document.getElementById('out').textContent",
+      "expect": "held"
+    },
+    {
+      "name": "release",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "mouse_up",
+            "x": 480,
+            "y": 40
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "it is released",
+      "op": "page",
+      "js": "return document.getElementById('out').textContent",
+      "expect": "released"
+    },
+    {
+      "name": "wheel inside the box",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "wheel",
+            "x": 490,
+            "y": 130,
+            "deltaY": 300
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true,
+            "scrolled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the box scrolled",
+      "op": "page",
+      "js": "return document.getElementById('box').scrollTop",
+      "expect": 300
+    },
+    {
+      "name": "refs for the drag",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~[draggable]"
+      }
+    },
+    {
+      "name": "drag the card to the lane by refs",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "drag",
+            "ref": "e3",
+            "to": "e4"
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the lane took the card",
+      "op": "page",
+      "js": "return document.getElementById('lane').textContent",
+      "expect": "Done: card"
+    },
+    {
+      "name": "drag the slider by points",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "drag",
+            "x": 35,
+            "y": 355,
+            "toX": 200,
+            "toY": 355
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the slider moved",
+      "op": "page",
+      "js": "return document.getElementById('knob').getAttribute('aria-valuenow')",
+      "expect": "200"
+    },
+    {
+      "name": "drop a file on the zone",
+      "op": "dropFiles",
+      "args": {
+        "ref": "e6",
+        "files": [
+          {
+            "name": "a.txt",
+            "base64": "aGk=",
+            "mimeType": "text/plain"
+          }
+        ]
+      },
+      "expect": {
+        "ok": true,
+        "dropped": [
+          "a.txt"
+        ],
+        "accepted": true
+      }
+    },
+    {
+      "name": "the zone got the file",
+      "op": "page",
+      "js": "return document.getElementById('out').textContent",
+      "expect": "dropped a.txt"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { Button, cn, Surface, Text } from "@misty/ui";
+import { Button, cn, notify, Surface, Text } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { useDevicePreferences } from "../device-preferences/store";
 
@@ -42,7 +42,7 @@ export function SettingsSaveBar() {
             void useDevicePreferences
               .getState()
               .discardStaged()
-              .catch(() => {})
+              .catch(() => notify({ message: "Couldn't undo your changes.", tone: "error" }))
           }
         >
           Cancel
@@ -55,7 +55,9 @@ export function SettingsSaveBar() {
             void useDevicePreferences
               .getState()
               .saveStaged()
-              .catch(() => {})
+              .catch(() =>
+                notify({ message: "Your changes weren't saved. Try again.", tone: "error" }),
+              )
               .finally(() => setSaving(false));
           }}
         >

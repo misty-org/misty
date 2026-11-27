@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AgentProfileInputSchema } from "../index.ts";
+import { AgentProfileInputSchema } from "../native_agents_schema";
 describe("native personal agents", () => {
   it("defaults to personal instructions and no implicit app assignments", () => {
     const agent = AgentProfileInputSchema.parse({

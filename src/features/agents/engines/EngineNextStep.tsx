@@ -8,7 +8,7 @@ import {
   SignInDialog,
   useCliUpdateFlow,
 } from "@/features/engine-config/clis";
-import { Button } from "@misty/ui";
+import { Button, notify } from "@misty/ui";
 import type { EngineSetupState, useEngineReadiness } from "./engine_readiness";
 
 export function EngineNextStep({
@@ -42,7 +42,11 @@ export function EngineNextStep({
         <Button
           icon={ExternalLink}
           aria-label={`Get ${name}`}
-          onClick={() => void openUrl(ENGINE_DOCS_URLS[engine]).catch(() => {})}
+          onClick={() =>
+            void openUrl(ENGINE_DOCS_URLS[engine]).catch(() =>
+              notify({ message: "Couldn't open the link. Try again.", tone: "error" }),
+            )
+          }
         >
           Get it
         </Button>

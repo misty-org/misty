@@ -1,4 +1,4 @@
-import { RefreshCw, Settings2 } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
   AppLogoImage,
@@ -13,26 +13,26 @@ import {
   ErrorState,
   FeatureCard,
   FeatureRow,
-  MenuItem,
   notify,
-  ProductInfo,
-  ProductPage,
-  ProductPreviews,
-  ProductSection,
   SettingsRow,
   SettingsSection,
-  Shelf,
-  ShelfItem,
-  ShelfSkeleton,
+  StoreInfo,
+  StorePreviews,
+  StoreSection,
+  StoreSheet,
+  StoreSheetSection,
+  StoreSkeleton,
+  StoreTile,
+  StoreTiles,
   Text,
   useConfirmDelete,
 } from "@misty/ui";
 import { exploreApps, type ExploreCatalogApp, type ExploreInstalledApps } from "./explore_apps";
 import { failureText, wordsMatch } from "./explore_index";
-import { useBarAction, useExploreNav, type BarAction } from "./explore_view";
+import { useExploreNav, type BarAction } from "./explore_view";
 import { ActionButton, SeeAll } from "./ListingRows";
 
-const megabytes = (bytes: number) => `${Math.max(1, Math.round(bytes / 1_000_000))} MB`;
+export const megabytes = (bytes: number) => `${Math.max(1, Math.round(bytes / 1_000_000))} MB`;
 
 const downloadProgress = (apps: ExploreInstalledApps, app: ExploreCatalogApp) => {
   const download = apps.downloadOf(app.id);
@@ -40,7 +40,13 @@ const downloadProgress = (apps: ExploreInstalledApps, app: ExploreCatalogApp) =>
   return { value: download.total ? download.received / download.total : 0 };
 };
 
-function AppLogo({ app, size = "tile" }: { app: ExploreCatalogApp; size?: "tile" | "hero" }) {
+export function AppLogo({
+  app,
+  size = "card",
+}: {
+  app: ExploreCatalogApp;
+  size?: "card" | "item" | "sheet";
+}) {
   return (
     <AppLogoImage
       src={exploreApps().catalogLogoUrl(app)}
@@ -113,12 +119,10 @@ function ApproveAppDialog({
   );
 }
 
-function useAppAction(
+export function useAppAction(
   apps: ExploreInstalledApps,
   app: ExploreCatalogApp,
-  onPage: boolean,
 ): { action: BarAction | null; dialog: ReactNode } {
-  const nav = useExploreNav();
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
   const here = apps.versionOf(app.id);
@@ -169,24 +173,15 @@ function useAppAction(
       action: { label: "Open", variant: "secondary", onClick: () => apps.open(app.id) },
       dialog,
     };
-  if (!onPage)
-    return {
-      action: {
-        label: "Get",
-        variant: "get",
-        onClick: () => nav.open({ kind: "apps", id: app.id }),
-      },
-      dialog,
-    };
   return { action: { label: "Get", variant: "get", disabled: busy, onClick: get }, dialog };
 }
 
-function AppItem({ apps, app }: { apps: ExploreInstalledApps; app: ExploreCatalogApp }) {
+export function AppItem({ apps, app }: { apps: ExploreInstalledApps; app: ExploreCatalogApp }) {
   const nav = useExploreNav();
-  const { action, dialog } = useAppAction(apps, app, false);
+  const { action, dialog } = useAppAction(apps, app);
   return (
     <>
-      <ShelfItem
+      <StoreTile
         logo={<AppLogo app={app} />}
         title={app.name}
         line={app.description ?? `By ${app.maker}`}
@@ -221,7 +216,7 @@ export function FeaturedApps({ spaceId }: { spaceId: string }) {
   );
 }
 
-export function AppsShelf({
+export function AppsSection({
   spaceId,
   query = "",
   limit,
@@ -247,18 +242,20 @@ export function AppsShelf({
         action={{ label: "Try again", icon: RefreshCw, variant: "secondary", onClick: apps.reload }}
       />
     );
-  if (!apps.loaded && !apps.error) return <ShelfSkeleton label="Apps" />;
+  if (!apps.loaded && !apps.error) return <StoreSkeleton label="Apps" look="tiles" items={4} />;
   if (!listed.length) return null;
   const shown = limit ? listed.slice(0, limit) : listed;
   return (
-    <Shelf
+    <StoreSection
       title="Apps"
       action={onSeeAll && listed.length > shown.length ? <SeeAll onClick={onSeeAll} /> : undefined}
     >
-      {shown.map((app) => (
-        <AppItem key={app.id} apps={apps} app={app} />
-      ))}
-    </Shelf>
+      <StoreTiles label="Apps">
+        {shown.map((app) => (
+          <AppItem key={app.id} apps={apps} app={app} />
+        ))}
+      </StoreTiles>
+    </StoreSection>
   );
 }
 
@@ -269,73 +266,81 @@ export function AppsPage({ spaceId }: { spaceId: string }) {
   return (
     <>
       <FeaturedApps spaceId={spaceId} />
-      <AppsShelf spaceId={spaceId} />
+      <AppsSection spaceId={spaceId} />
     </>
   );
 }
 
-export function AppProduct({ spaceId, id }: { spaceId: string; id: string }) {
+export function AppSheet({
+  spaceId,
+  id,
+  onClose,
+}: {
+  spaceId: string;
+  id: string;
+  onClose: () => void;
+}) {
   const apps = exploreApps().useExploreInstalledApps(spaceId);
   const app = apps.listed.find((one) => one.id === id);
-  if (!app)
-    return (
-      <EmptyState
-        inline
-        title="This app isn't listed any more"
-        line="Misty's registry no longer has it."
-      />
-    );
-  return <AppProductPage apps={apps} app={app} />;
+  if (!app) return null;
+  return <AppSheetBody apps={apps} app={app} onClose={onClose} />;
 }
 
-function AppProductPage({ apps, app }: { apps: ExploreInstalledApps; app: ExploreCatalogApp }) {
-  const nav = useExploreNav();
-  const { action, dialog } = useAppAction(apps, app, true);
-  useBarAction(action, app.name);
+function AppSheetBody({
+  apps,
+  app,
+  onClose,
+}: {
+  apps: ExploreInstalledApps;
+  app: ExploreCatalogApp;
+  onClose: () => void;
+}) {
+  const { action, dialog } = useAppAction(apps, app);
+  const { confirm, dialog: confirmDialog } = useConfirmDelete();
   const here = apps.versionOf(app.id);
   return (
-    <ProductPage
-      logo={<AppLogo app={app} size="hero" />}
+    <StoreSheet
+      open
+      onOpenChange={(open) => !open && onClose()}
+      logo={<AppLogo app={app} size="sheet" />}
       title={app.name}
-      line={app.description}
       maker={app.maker}
       action={<ActionButton action={action} size="md" label={app.name} />}
-      menu={
-        here !== undefined ? (
-          <MenuItem
-            icon={Settings2}
-            label="Manage"
-            onSelect={() => nav.manage({ kind: "apps", id: app.id })}
-          />
-        ) : undefined
-      }
-      onHeroOut={nav.setPinned}
       facts={[
-        { label: "Made by", value: app.maker },
-        { label: "Version", value: app.version },
+        { label: "Version", value: here ?? app.version },
         { label: "Size", value: megabytes(app.size) },
-        ...(app.permissions.includes("files")
-          ? [{ label: "Works with", value: "Files", detail: "In the Space you open it in" }]
-          : []),
+        ...(app.license ? [{ label: "License", value: app.license }] : []),
+        { label: "Source", value: app.upstream.includes("github.com") ? "GitHub" : app.upstream },
       ]}
     >
+      {app.description ? (
+        <Text as="p" size="body" wrap className="m-0">
+          {app.description}
+        </Text>
+      ) : null}
       {app.screenshots?.length ? (
-        <ProductSection title="Preview">
-          <ProductPreviews
-            previews={app.screenshots.map((src, index) => ({
-              src,
-              alt: `${app.name}, picture ${index + 1}`,
-            }))}
-          />
-        </ProductSection>
+        <StorePreviews
+          previews={app.screenshots.map((src, index) => ({
+            src,
+            alt: `${app.name}, picture ${index + 1}`,
+          }))}
+        />
       ) : null}
       {app.permissions.length ? (
-        <ProductSection title="What it can do">
+        <StoreSheetSection title="What it can do">
           <PermissionLines apps={apps} permissions={app.permissions} />
-        </ProductSection>
+        </StoreSheetSection>
       ) : null}
-      <ProductSection title="Information">
-        <ProductInfo
+      {here !== undefined ? (
+        <SettingsSection title="On this computer">
+          <SettingsRow
+            label={`Version ${here}`}
+            description={here === app.version ? "Up to date" : `${app.version} is out`}
+          />
+        </SettingsSection>
+      ) : null}
+      <StoreSheetSection title="Information">
+        <StoreInfo
           items={[
             { label: "Made by", value: app.maker },
             { label: "Source", value: app.upstream },
@@ -343,61 +348,28 @@ function AppProductPage({ apps, app }: { apps: ExploreInstalledApps; app: Explor
             { label: "Version", value: app.version },
           ]}
         />
-      </ProductSection>
-      {dialog}
-    </ProductPage>
-  );
-}
-
-export function AppManage({ spaceId, id }: { spaceId: string; id: string }) {
-  const apps = exploreApps().useExploreInstalledApps(spaceId);
-  const app = apps.listed.find((one) => one.id === id);
-  if (!app) return null;
-  return <AppManageRows apps={apps} app={app} />;
-}
-
-function AppManageRows({ apps, app }: { apps: ExploreInstalledApps; app: ExploreCatalogApp }) {
-  const { confirm, dialog } = useConfirmDelete();
-  const { action, dialog: approve } = useAppAction(apps, app, true);
-  const here = apps.versionOf(app.id);
-  if (here === undefined) return null;
-  return (
-    <SettingsSection title={app.name}>
-      <SettingsRow label="On this computer" description="It opens in the Space the window shows">
-        <Button size="sm" onClick={() => apps.open(app.id)}>
-          Open
-        </Button>
-      </SettingsRow>
-      <SettingsRow
-        label={`Version ${here}`}
-        description={here === app.version ? "Up to date" : `${app.version} is out`}
-      >
-        {here !== app.version ? (
-          <Button variant="get" size="sm" onClick={() => action?.onClick()}>
-            Update
+      </StoreSheetSection>
+      {here !== undefined ? (
+        <div>
+          <Button
+            variant="danger"
+            onClick={() =>
+              void confirm({
+                title: `Remove ${app.name}?`,
+                what: `${app.name} is removed from this computer. What it saved stays in each Space's Files.`,
+                confirmLabel: "Remove",
+                onConfirm: async () => {
+                  await apps.remove(app.id);
+                },
+              })
+            }
+          >
+            Remove
           </Button>
-        ) : null}
-      </SettingsRow>
-      <SettingsRow label="Remove from this computer">
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={() =>
-            void confirm({
-              title: `Remove ${app.name}?`,
-              what: `${app.name} is removed from this computer. What it saved stays in each Space's Files.`,
-              confirmLabel: "Remove",
-              onConfirm: async () => {
-                await apps.remove(app.id);
-              },
-            })
-          }
-        >
-          Remove
-        </Button>
-      </SettingsRow>
+        </div>
+      ) : null}
       {dialog}
-      {approve}
-    </SettingsSection>
+      {confirmDialog}
+    </StoreSheet>
   );
 }

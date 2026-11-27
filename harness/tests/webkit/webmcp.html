@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Todos</title></head>
+<body>
+  <ul id="todos"></ul>
+  <script>
+    const todos = [];
+    const draw = () => { document.getElementById("todos").innerHTML = todos.map((todo) => `<li>${todo}</li>`).join(""); };
+    navigator.modelContext.registerTool({
+      name: "list_todos", description: "Lists the todos.", inputSchema: { type: "object", properties: {} },
+      annotations: { readOnlyHint: true },
+      execute: async () => ({ todos }),
+    });
+    navigator.modelContext.registerTool({
+      name: "add_todo", description: "Adds a todo.", inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+      execute: async ({ text }) => { todos.push(text); draw(); return { added: text, count: todos.length }; },
+    });
+    document.modelContext.registerTool({
+      name: "broken", description: "Always fails.", annotations: { readOnlyHint: true },
+      execute: async () => { throw new Error("Nope"); },
+    });
+  </script>
+</body></html>

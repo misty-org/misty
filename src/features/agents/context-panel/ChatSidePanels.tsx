@@ -1,25 +1,22 @@
 // Layout adapted from OpenChamber (MIT, Copyright (c) 2025 Bohdan Triapitsyn).
 import {
+  BookOpenText,
   FolderTree,
   GitCompareArrows,
   Globe,
   ListOrdered,
-  Pin,
   ScrollText,
   SquareTerminal,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import {
-  IconButton,
-  SideCard,
-  SidePanel,
-  lazyTool,
-  profileIcons,
-  ToolSuspense,
-  type FramedPageColumn,
-} from "@misty/ui";
+import type { ReactNode } from "react";
+import { SideCard, SidePanel, lazyTool, profileIcons, ToolSuspense } from "@misty/ui";
+import { AgentMemoryPage } from "../memory/AgentMemoryPage";
+import { SessionGoalPanel } from "../goals/SessionGoalPanel";
+import { homeSpaceOf } from "../personal/agent_home_space";
 import {
   closeAgentBrowser,
   isBrowserOpen,
@@ -27,10 +24,7 @@ import {
   useAgentBrowser,
 } from "../agent-browser/agent_browser_store";
 import {
-  CHAT_MIN_WIDTH,
   PANEL_DEFAULT_WIDTH,
-  PANEL_MAX_WIDTH,
-  PANEL_MIN_WIDTH,
   useContextPanel,
   type ContextPanelSurface,
 } from "./context_panel_store";
@@ -50,10 +44,12 @@ const AgentBrowser = lazyTool(async () => ({
 
 const surfaces: Record<ContextPanelSurface | "browser", [name: string, icon: LucideIcon]> = {
   browser: ["Browser", Globe],
+  goal: ["Goal", Target],
   steps: ["Steps", ListOrdered],
   changes: ["Changes", GitCompareArrows],
   files: ["Files", FolderTree],
   terminal: ["Terminal", SquareTerminal],
+  memory: ["Memory", BookOpenText],
   profile: ["Profile", profileIcons.agent],
 };
 
@@ -85,15 +81,14 @@ export function useSidePanelShown(conversationId: string) {
   return tab !== null || browserOpen || logOpen;
 }
 
-const profileWidth = 256;
-const profileMinWidth = 240;
+const profileWidth = 288;
 
 export function useAgentChatSidePanel(props: {
   conversationId: string;
   agent: AgentProfile;
+  accountId: string;
   active: boolean;
-  room: number | null;
-}): FramedPageColumn | null {
+}): ReactNode {
   const tab = useContextPanel((state) => state.tab);
   const expanded = useContextPanel((state) => state.expanded);
   const browserChat = chatKey(props.conversationId);
@@ -104,98 +99,78 @@ export function useAgentChatSidePanel(props: {
   const surface = tab ?? (browserOpen ? "browser" : null);
   if (!props.active || !surface) return null;
   const panel = useContextPanel.getState();
-  const fits = (minWidth: number) =>
-    props.room === null || props.room > CHAT_MIN_WIDTH + minWidth + 1;
   if (surface === "profile")
-    return {
-      id: "profile",
-      label: "Resize the profile",
-      width: profileWidth,
-      minWidth: profileMinWidth,
-      maxWidth: PANEL_MAX_WIDTH,
-      expanded: !fits(profileMinWidth),
-      content: (
-        <SidePanel
-          label={`${props.agent.name}'s profile`}
-          name={surfaces.profile[0]}
-          icon={surfaces.profile[1]}
-          onClose={() => panel.close()}
-          className="context-panel"
-          data-panel="profile"
-        >
-          <AgentProfileCard agent={props.agent} />
-        </SidePanel>
-      ),
-    };
+    return (
+      <SidePanel
+        floating
+        width={profileWidth}
+        label={`${props.agent.name}'s profile`}
+        name={surfaces.profile[0]}
+        icon={surfaces.profile[1]}
+        onClose={() => panel.close()}
+        className="context-panel"
+        data-panel="profile"
+      >
+        <AgentProfileCard agent={props.agent} />
+      </SidePanel>
+    );
   const [name, icon] =
     surface === "browser" && logOpen ? (["Browser log", ScrollText] as const) : surfaces[surface];
-  return {
-    id: surface,
-    label: `Resize the ${name.toLowerCase()}`,
-    width: PANEL_DEFAULT_WIDTH,
-    minWidth: PANEL_MIN_WIDTH,
-    maxWidth: PANEL_MAX_WIDTH,
-    expanded: expanded || !fits(PANEL_MIN_WIDTH),
-    content: (
-      <SidePanel
-        label={name}
-        name={name}
-        icon={icon}
-        expanded={expanded}
-        onToggleExpanded={fits(PANEL_MIN_WIDTH) ? panel.toggleExpanded : undefined}
-        onClose={() => {
-          if (surface !== "browser") return panel.close();
-          closeBrowserLog(browserChat);
-          closeAgentBrowser(browserChat);
-        }}
-        className="agent-studio-context context-panel"
-        data-panel={surface}
-      >
-        {surface === "browser" ? (
-          <ToolSuspense tool="browser">
-            <AgentBrowser key={browserChat} conversationId={browserChat} />
-          </ToolSuspense>
-        ) : (
-          <ToolSuspense tool={surface === "terminal" ? "terminal" : `${surface} view`}>
-            <AgentContextPanel
-              tab={surface}
-              conversationId={props.conversationId}
-              agent={props.agent}
-            />
-          </ToolSuspense>
-        )}
-      </SidePanel>
-    ),
-  };
+  return (
+    <SidePanel
+      floating
+      width={PANEL_DEFAULT_WIDTH}
+      label={name}
+      name={name}
+      icon={icon}
+      expanded={expanded}
+      onToggleExpanded={panel.toggleExpanded}
+      onClose={() => {
+        if (surface !== "browser") return panel.close();
+        closeBrowserLog(browserChat);
+        closeAgentBrowser(browserChat);
+      }}
+      className="agent-studio-context context-panel"
+      data-panel={surface}
+    >
+      {surface === "browser" ? (
+        <ToolSuspense tool="browser">
+          <AgentBrowser key={browserChat} conversationId={browserChat} />
+        </ToolSuspense>
+      ) : surface === "goal" ? (
+        <SessionGoalPanel key={browserChat} conversationId={browserChat} />
+      ) : surface === "memory" ? (
+        <AgentMemoryPage
+          accountId={props.accountId}
+          agentId={props.agent.id}
+          agentName={props.agent.name}
+          engine={props.agent.engine}
+          conversationId={props.conversationId}
+          spaceId={
+            props.agent.system_managed ? undefined : homeSpaceOf(props.accountId, props.agent)
+          }
+        />
+      ) : (
+        <ToolSuspense tool={surface === "terminal" ? "terminal" : `${surface} view`}>
+          <AgentContextPanel
+            tab={surface}
+            conversationId={props.conversationId}
+            agent={props.agent}
+          />
+        </ToolSuspense>
+      )}
+    </SidePanel>
+  );
 }
 
 export function ChatSessionCard(props: { conversationId: string; agent: AgentProfile }) {
   const session = useContextPanel((state) => state.session);
-  const tucked = useContextPanel((state) => state.sessionTucked);
-  const setTucked = useContextPanel((state) => state.setSessionTucked);
   const covered = useSidePanelShown(props.conversationId);
   if (!session || covered) return null;
-  const pinned = !tucked;
-  const corner = (
-    <IconButton
-      label={pinned ? "Unpin" : "Pin open"}
-      hint={pinned ? "Unpin: hide to the edge" : "Pin open"}
-      tooltipSide="bottom"
-      aria-pressed={pinned}
-      onClick={() => setTucked(pinned)}
-    >
-      <Pin fill={pinned ? "currentColor" : "none"} />
-    </IconButton>
-  );
   return (
-    <SideCard
-      label="Session"
-      floating
-      tucked={tucked}
-      className="agent-studio-session context-panel"
-    >
+    <SideCard label="Session" floating className="agent-studio-session context-panel">
       <ToolSuspense tool="session card" size="inline">
-        <SessionPanel conversationId={props.conversationId} agent={props.agent} corner={corner} />
+        <SessionPanel conversationId={props.conversationId} agent={props.agent} />
       </ToolSuspense>
     </SideCard>
   );

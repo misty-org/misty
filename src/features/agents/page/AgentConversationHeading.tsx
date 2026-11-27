@@ -16,6 +16,11 @@ import { useContextPanel } from "../context-panel/context_panel_store";
 import { useRailShown } from "../context-panel/rail_layout_store";
 
 const notBusy = () => false;
+
+function threadName(title: string | undefined, agentName: string | undefined) {
+  const name = title?.trim();
+  return name && name !== agentName?.trim() ? name : undefined;
+}
 const noTranscript = () => ({ inCall: false, shown: false, toggle: () => undefined });
 
 function useAgentSees(agent?: AgentProfile): boolean {
@@ -63,6 +68,7 @@ export function AgentStudioBar({
       <ChannelHeader
         leading={<AgentAvatar agent={agent} face />}
         name={agent?.name ?? "Agent"}
+        thread={threadName(conversation?.title, agent?.name)}
         actions={[
           ...chatCallItems(calls),
           ...(transcript.inCall

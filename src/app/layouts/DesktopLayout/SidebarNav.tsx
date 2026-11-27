@@ -1,5 +1,5 @@
 import { useInRouterContext, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { useFocusedPaneHistory } from "@/features/app-windows";
 import { IconButton } from "@misty/ui";
@@ -13,10 +13,10 @@ function NavButtons(props: {
   return (
     <div className="flex items-center" data-browser-toolbar data-sidebar>
       <IconButton label="Back" disabled={!props.canBack} onClick={props.onBack}>
-        <ArrowLeft />
+        <ChevronLeft />
       </IconButton>
       <IconButton label="Forward" disabled={!props.canForward} onClick={props.onForward}>
-        <ArrowRight />
+        <ChevronRight />
       </IconButton>
     </div>
   );

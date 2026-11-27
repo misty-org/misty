@@ -27,8 +27,10 @@ export interface FriendsList {
 export interface DirectConversation {
   id: string;
   kind: "direct" | "group";
+  name?: string;
   members: Person[];
   unread_count: number;
+  avatar_version?: number;
   last_message_at?: string;
   read_only: boolean;
   created_at: string;
@@ -108,6 +110,8 @@ export const directApi = {
       method: "POST",
       ...json({ user_ids: userIds }),
     }),
+  renameGroupDm: (dmId: string, name: string) =>
+    spaceRequest<DirectConversation>(`/dms/${id(dmId)}`, { method: "PATCH", ...json({ name }) }),
   leaveDm: (dmId: string) => spaceRequest(`/dms/${id(dmId)}/members/me`, { method: "DELETE" }),
   deleteDm: (dmId: string) => spaceRequest(`/dms/${id(dmId)}`, { method: "DELETE" }),
   ringDm: (

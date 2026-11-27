@@ -70,9 +70,6 @@ it("opens a page from the sidebar while a chat is open, and the chat again after
   expect(page()).toBe("files");
   expect(route()).toBe("/agents?view=files");
 
-  follow("/agents?view=memory");
-  expect(page()).toBe("memory");
-
   follow(agentChatRoute("research", "second"));
   expect(page()).toBe("task");
   expect(useMistyStore.getState().activeConversationId).toBe("second");
@@ -135,8 +132,8 @@ it("sends the sidebar's links to the focused pane of a split, and leaves the oth
         .getState()
         .focusView(viewIn(useWorkspaceStore.getState().layout, left)!.id),
   );
-  follow("/agents?view=memory");
-  expect(pageIn(left)).toBe("memory");
+  follow("/agents?view=files");
+  expect(pageIn(left)).toBe("files");
   expect(pageIn(right)).toBe("files");
   expect(routeIn(right)).toBe("/agents?view=files");
 });

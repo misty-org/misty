@@ -16,28 +16,17 @@ fn require_main(webview: &tauri::Webview) -> ApiResult<()> {
 
 #[tauri::command]
 pub async fn agents_share_folder(
-    app: tauri::AppHandle,
     webview: tauri::Webview,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<Option<Value>> {
-    use tauri_plugin_dialog::DialogExt;
     require_main(&webview)?;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title("Choose a folder to share with agents")
-        .pick_folder(move |folder| {
-            let _ = send.send(folder);
-        });
-    let Some(folder) = receive
+    let pick = crate::files::pick::Pick::folder("Choose a folder to share with agents");
+    let Some(path) = crate::files::pick::pick_one(&webview, pick)
         .await
-        .map_err(|_| ApiError::Message("Folder selection was canceled.".into()))?
+        .map_err(ApiError::Message)?
     else {
         return Ok(None);
     };
-    let path = folder
-        .into_path()
-        .map_err(|_| ApiError::Message("Choose a local folder.".into()))?;
     state
         .agents
         .share_folder(path, &[state.environment.misty_dir()])

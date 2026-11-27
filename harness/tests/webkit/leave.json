@@ -1,0 +1,20 @@
+{
+  "page": "leave.html",
+  "run": [
+    {"name": "the page reads", "op": "snapshot", "expect": {"tree": "~Go to the first page"}},
+    {"name": "the person has used the page, as WebKit needs before it asks", "op": "activate"},
+    {"name": "leaving asks first and is held", "op": "steps", "input": {"steps": [{"action": "click", "ref": "e1"}]},
+     "expect": {"heldDialog": {"kind": "beforeunload"}, "stopped": "~waiting"}},
+    {"name": "other tools wait for it", "op": "steps", "input": {"steps": [{"action": "key", "key": "Tab"}]},
+     "expect": {"tool_error": {"code": "browser_dialog_held"}}},
+    {"name": "staying keeps the page", "op": "steps", "input": {"steps": [{"action": "dialog", "accept": false}]},
+     "expect": {"steps": [{"ok": true, "dialog": {"kind": "beforeunload", "accepted": false}}]}},
+    {"name": "still on the draft", "op": "page", "js": "return document.title", "expect": "Draft"},
+    {"name": "leaving again", "op": "steps", "input": {"steps": [{"action": "click", "ref": "e1"}]},
+     "expect": {"heldDialog": {"kind": "beforeunload"}}},
+    {"name": "leave", "op": "steps", "input": {"steps": [{"action": "dialog", "accept": true}]},
+     "expect": {"steps": [{"ok": true, "dialog": {"accepted": true}}]}},
+    {"name": "the next page opened", "op": "wait", "ms": 800},
+    {"name": "on the first page", "op": "page", "js": "return location.pathname", "expect": "/first.html"}
+  ]
+}

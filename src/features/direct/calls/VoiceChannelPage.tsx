@@ -18,7 +18,8 @@ import { OwnCallFace } from "./OwnCallFace";
 import { useCallStore } from "./call_store";
 import { CallStageView } from "./CallView";
 import { joinVoiceChannel } from "./voice_channels";
-import { savedCallDevice } from "./call_devices";
+import { useSavedInputDevice } from "@/features/voice";
+import { savedCallDevice, useSavedCamera, useSavedSpeaker } from "./call_devices";
 import { DeviceChoices, SpeakerChoices } from "./DeviceChoices";
 
 function CameraPreview({ deviceId }: { deviceId: string }) {
@@ -73,9 +74,9 @@ function Lobby({
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(false);
   const [joining, setJoining] = useState(false);
-  const mic = savedCallDevice.audioinput((state) => state.value);
-  const speaker = savedCallDevice.audiooutput((state) => state.value);
-  const camera = savedCallDevice.videoinput((state) => state.value);
+  const mic = useSavedInputDevice((state) => state.value);
+  const speaker = useSavedSpeaker((state) => state.value);
+  const camera = useSavedCamera((state) => state.value);
   const join = () => {
     if (!userId || joining) return;
     setJoining(true);

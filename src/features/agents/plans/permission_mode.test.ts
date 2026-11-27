@@ -24,12 +24,11 @@ beforeEach(() => {
   useCollaborationStore.setState({ byConversation: {}, draftPermissionMode: "", error: "" });
 });
 
-it("follows the chat, then its agent, then Ask", () => {
+it("follows the chat, then its draft, then the no-asking default", () => {
   expect(effectivePermissionMode(conversation({ permissionMode: "ask" }), "")).toBe("ask");
-  expect(effectivePermissionMode(conversation(), "")).toBe("auto");
-  expect(effectivePermissionMode(undefined, "", "auto")).toBe("auto");
-  expect(effectivePermissionMode(undefined, "ask", "auto")).toBe("ask");
-  expect(effectivePermissionMode(undefined, "")).toBe("ask");
+  expect(effectivePermissionMode(conversation(), "")).toBe("bypass");
+  expect(effectivePermissionMode(undefined, "ask")).toBe("ask");
+  expect(effectivePermissionMode(undefined, "")).toBe("bypass");
 });
 
 it("keeps a new chat's choice as a draft until the chat exists", async () => {

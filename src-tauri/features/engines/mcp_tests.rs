@@ -85,3 +85,29 @@ fn knows_its_own_tools_only_by_the_exact_name_an_engine_gives() {
         assert!(!names_misty_tool(other), "{other}");
     }
 }
+
+#[test]
+fn every_space_tool_reaches_the_engine_as_an_mcp_tool() {
+    for tool in space_tools() {
+        let name = tool["name"].as_str().unwrap_or("");
+        let offered = as_tool(tool.clone()).unwrap_or_else(|| panic!("{name} is offered"));
+        assert_eq!(&*offered.name, name);
+        assert!(offered.input_schema.contains_key("type"), "{name}");
+    }
+    let bare = as_tool(json!({ "name": "app_demo_crop", "inputSchema": null })).unwrap();
+    assert_eq!(bare.input_schema.get("type"), Some(&json!("object")));
+}
+
+#[test]
+fn a_tool_result_keeps_its_text_its_pictures_and_whether_it_failed() {
+    let failed = as_result(tool_error("There is no tool named x.".into()));
+    assert_eq!(failed.is_error, Some(true));
+    assert_eq!(failed.content.len(), 1);
+    let shown = as_result(result_content(json!({
+        "ok": true,
+        "image": { "dataUrl": "data:image/png;base64,AAAA" },
+    })));
+    assert_ne!(shown.is_error, Some(true));
+    assert_eq!(shown.content.len(), 2);
+    assert!(matches!(shown.content[1], ContentBlock::Image(_)));
+}

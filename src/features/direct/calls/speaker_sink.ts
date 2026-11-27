@@ -1,4 +1,4 @@
-import { savedSpeaker } from "./call_devices";
+import { useSavedSpeaker } from "./call_devices";
 
 type SinkContext = AudioContext & { setSinkId?: (id: string) => Promise<void> };
 type SinkElement = HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> };
@@ -34,8 +34,8 @@ export function speakerSink(context: AudioContext): SpeakerSink {
     if (element && typeof element.setSinkId === "function")
       void element.setSinkId(next).catch(() => undefined);
   };
-  route(savedSpeaker.getState().value);
-  const unsubscribe = savedSpeaker.subscribe((state) => route(state.value));
+  route(useSavedSpeaker.getState().value);
+  const unsubscribe = useSavedSpeaker.subscribe((state) => route(state.value));
   const wake = () => {
     if (context.state === "suspended") void context.resume().catch(() => undefined);
     if (element?.paused) void element.play().catch(() => undefined);

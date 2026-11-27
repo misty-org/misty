@@ -49,8 +49,8 @@ pub async fn capture(webview: Webview) -> Result<Value, String> {
     }))
 }
 
-const OVERLAY_HIDE: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e) { e.dataset.mistyCaptureDisplay = e.style.display; e.style.setProperty('display', 'none', 'important'); } } })()";
-const OVERLAY_SHOW: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e && 'mistyCaptureDisplay' in e.dataset) { e.style.display = e.dataset.mistyCaptureDisplay; delete e.dataset.mistyCaptureDisplay; } } })()";
+pub(crate) const OVERLAY_HIDE: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e) { e.dataset.mistyCaptureDisplay = e.style.display; e.style.setProperty('display', 'none', 'important'); } } })()";
+pub(crate) const OVERLAY_SHOW: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e && 'mistyCaptureDisplay' in e.dataset) { e.style.display = e.dataset.mistyCaptureDisplay; delete e.dataset.mistyCaptureDisplay; } } })()";
 
 fn dimensions(base64_data: &str) -> Option<(u32, u32)> {
     use base64::Engine;

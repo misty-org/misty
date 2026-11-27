@@ -7,7 +7,7 @@ import { sourceOf } from "./sources";
 
 let held: FileItem[] = [];
 
-async function readItem(item: FileItem): Promise<File> {
+export async function readItem(item: FileItem): Promise<File> {
   const path = localPath(item);
   if (path) return readFileFromPath(path);
   if (item.source.kind === "drive") return driveFileOf(item.source.entry);

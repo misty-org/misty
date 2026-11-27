@@ -85,12 +85,24 @@ static ORDER: AtomicU64 = AtomicU64::new(0);
 
 static WITHDRAWN: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
+static CHANGES: LazyLock<tokio::sync::watch::Sender<()>> =
+    LazyLock::new(|| tokio::sync::watch::channel(()).0);
+
 pub fn withdrawn() -> tokio::sync::futures::Notified<'static> {
     WITHDRAWN.notified()
 }
 
+pub fn changes() -> tokio::sync::watch::Receiver<()> {
+    CHANGES.subscribe()
+}
+
+fn tell_changed() {
+    CHANGES.send_replace(());
+}
+
 fn tell_withdrawn() {
     WITHDRAWN.notify_waiters();
+    tell_changed();
 }
 
 fn registry() -> MutexGuard<'static, HashMap<String, Entry>> {
@@ -191,6 +203,8 @@ pub fn register(session: &str, webview: &str, raw_tools: &[Value]) -> Result<usi
             order,
         },
     );
+    drop(registry);
+    tell_changed();
     Ok(count)
 }
 
@@ -285,6 +299,7 @@ pub fn register_standby(
             order: next_order(),
         },
     );
+    tell_changed();
     Ok(count)
 }
 
@@ -307,11 +322,13 @@ pub(super) fn register_program(app_id: &str, raw_tools: &[Value]) -> Result<usiz
             order: next_order(),
         },
     );
+    tell_changed();
     Ok(count)
 }
 
 pub(super) fn unregister_program(app_id: &str) {
     registry().remove(&program_key(app_id));
+    tell_changed();
 }
 
 pub fn served_by_program(internal: &str) -> Option<(String, String)> {

@@ -8,15 +8,21 @@ import { treeKeepsLayoutWhileHidden } from "./kept_tabs";
 
 export function WorkspaceTabPanels(props: {
   layout: WorkspaceLayout;
+  away?: WorkspaceLayout[];
   renderTree(tab: WorkspaceTab, active: boolean): ReactNode;
   gridColumn?: number;
 }) {
   const { layout } = props;
   const mistySide = useMistyPanelSide();
 
-  return layoutTabs(layout).map((tab) => {
-    const active = tab.id === layout.activeTabId;
-    const kept = !active && treeKeepsLayoutWhileHidden(tab.root);
+  const shown = layoutTabs(layout).map((tab) => ({ tab, elsewhere: false }));
+  const running = (props.away ?? []).flatMap((aside) =>
+    layoutTabs(aside).map((tab) => ({ tab, elsewhere: true })),
+  );
+
+  return [...shown, ...running].map(({ tab, elsewhere }) => {
+    const active = !elsewhere && tab.id === layout.activeTabId;
+    const kept = !active && !elsewhere && treeKeepsLayoutWhileHidden(tab.root);
     return (
       <PaneFrame
         key={tab.id}
@@ -39,9 +45,7 @@ export function WorkspaceTabPanels(props: {
         aria-hidden={!active}
         inert={!active && !kept}
       >
-        <div className="misty-pane-frame relative min-h-0 min-w-0 flex-1">
-          {props.renderTree(tab, active)}
-        </div>
+        <div className="relative min-h-0 min-w-0 flex-1">{props.renderTree(tab, active)}</div>
         {active ? <WorkspaceMistyDock /> : null}
       </PaneFrame>
     );

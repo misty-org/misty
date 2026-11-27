@@ -54,7 +54,7 @@ export function ChannelRowMenu(props: {
   const mute = useMuted(
     props.spaceId,
     chatMuteId(props.spaceId, conversation?.id ?? ""),
-    "Notifications off for this channel",
+    "this channel",
   );
   const layout = channelLayout(conversations, categories);
   const group = conversation

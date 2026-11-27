@@ -35,7 +35,7 @@
     for (const record of records) {
       if (own(record.target) || [...record.addedNodes].some(own) || [...record.removedNodes].some(own)) continue;
       if (record.type === "attributes") {
-        if (record.attributeName === BUSY) continue;
+        if (record.attributeName === BUSY || record.attributeName?.startsWith("data-misty-")) continue;
         // Writing an attribute's current value changes nothing (some apps rewrite a class every frame).
         if (record.oldValue === record.target.getAttributeNS(record.attributeNamespace, record.attributeName)) continue;
         if (record.attributeName === "style") {

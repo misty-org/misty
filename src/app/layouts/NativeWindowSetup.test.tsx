@@ -48,6 +48,9 @@ vi.mock("@/shared/platform/os", () => ({
 vi.mock("../Router", () => ({
   AppRouter: () => null,
 }));
+vi.mock("@/features/spaces/file-pick", () => ({
+  FilePickHost: () => null,
+}));
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();

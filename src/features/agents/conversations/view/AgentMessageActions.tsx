@@ -28,9 +28,8 @@ export function AgentMessageActions(props: {
   text: string;
   working: boolean;
   retryPrompt?: string;
-  retryFrom?: string;
   resendable?: boolean;
-  onRetry: (prompt: string, fromMessageId?: string) => void;
+  onRetry: (prompt: string) => void;
   onEdit?: (text: string) => void;
   onReply?: (quote: string) => void;
 }) {
@@ -64,7 +63,7 @@ export function AgentMessageActions(props: {
       icon: RefreshCw,
       label: "Ask again",
       disabled: props.working,
-      onSelect: () => props.onRetry(props.text, message.id),
+      onSelect: () => props.onRetry(props.text),
     });
   if (!user && props.onReply && props.text)
     actions.push({
@@ -117,7 +116,7 @@ export function AgentMessageActions(props: {
       icon: RotateCcw,
       label: "Try again",
       disabled: props.working,
-      onSelect: () => props.onRetry(props.retryPrompt!, props.retryFrom),
+      onSelect: () => props.onRetry(props.retryPrompt!),
     });
   return (
     <>

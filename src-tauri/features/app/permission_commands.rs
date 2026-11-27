@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::{AppHandle, Webview};
-use tauri_plugin_dialog::DialogExt;
 
 use crate::browser::app_windows;
 use file_access;
@@ -68,37 +67,38 @@ pub fn sandbox_permission_set(
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
-pub struct SaveFileFilter {
-    pub name: String,
-    pub extensions: Vec<String>,
+fn free_name(folder: &std::path::Path, name: &str) -> PathBuf {
+    let wanted = folder.join(name);
+    if file_access::fs::metadata(&wanted).is_err() {
+        return wanted;
+    }
+    let (stem, extension) = match name.rsplit_once('.') {
+        Some((stem, extension)) if !stem.is_empty() => (stem, format!(".{extension}")),
+        _ => (name, String::new()),
+    };
+    (2..)
+        .map(|count| folder.join(format!("{stem} {count}{extension}")))
+        .find(|path| file_access::fs::metadata(path).is_err())
+        .unwrap_or(wanted)
 }
 
 #[tauri::command]
 pub async fn sandbox_pick_save_file(
-    app: AppHandle,
+    webview: Webview,
     title: Option<String>,
     default_name: String,
-    filters: Vec<SaveFileFilter>,
 ) -> Result<Option<String>, String> {
-    let (send, receive) = tokio::sync::oneshot::channel();
-    let mut dialog = app.dialog().file().set_file_name(&default_name);
-    if let Some(title) = title {
-        dialog = dialog.set_title(title);
-    }
-    for filter in &filters {
-        let extensions: Vec<&str> = filter.extensions.iter().map(String::as_str).collect();
-        dialog = dialog.add_filter(&filter.name, &extensions);
-    }
-    dialog.save_file(move |file| {
-        let _ = send.send(file);
-    });
-    let Some(file) = receive.await.ok().flatten() else {
+    let name = std::path::Path::new(&default_name)
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
+        .ok_or("Give the file a name.")?;
+    let title = title.unwrap_or_else(|| format!("Choose where to save {name}"));
+    let pick = crate::files::pick::Pick::folder(&title);
+    let Some(folder) = crate::files::pick::pick_one(&webview, pick).await? else {
         return Ok(None);
     };
-    let path: PathBuf = file
-        .into_path()
-        .map_err(|_| "Choose a location on this computer.".to_owned())?;
+    let path = free_name(&folder, &name);
     file_access::allow_picked_file(&path, file_access::Access::Write);
     Ok(Some(path.to_string_lossy().into_owned()))
 }

@@ -7,7 +7,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  Button,
   Checkbox,
   OverflowFadeText,
   Text,
@@ -68,10 +67,10 @@ export function RewindFilesDialog({
                   </OverflowFadeText>
                   <Text size="meta" bare tone="muted" className="shrink-0">
                     {file.changedByYou
-                      ? "Changed since"
+                      ? "Changed later"
                       : file.change === "remove"
                         ? "Remove"
-                        : "Restore"}
+                        : "Put back"}
                   </Text>
                 </label>
               </li>
@@ -80,24 +79,27 @@ export function RewindFilesDialog({
         </ul>
         {plan?.incomplete ? (
           <Text size="control" bare as="p" tone="muted">
-            Some of these turns weren&apos;t saved, so their changes stay.
+            Some of these turns left no copy to go back to, so their changes stay.
           </Text>
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button onClick={() => onChoose({ kind: "keep" })}>Keep files</Button>
           <AlertDialogAction
-            disabled={!chosen.size}
+            widthOf={["Keep files", "Put files back"]}
             onClick={() =>
-              onChoose({
-                kind: "restore",
-                files: files
-                  .filter((file) => chosen.has(fileKey(file)))
-                  .map(({ folder, path }) => ({ folder, path })),
-              })
+              onChoose(
+                chosen.size
+                  ? {
+                      kind: "restore",
+                      files: files
+                        .filter((file) => chosen.has(fileKey(file)))
+                        .map(({ folder, path }) => ({ folder, path })),
+                    }
+                  : { kind: "keep" },
+              )
             }
           >
-            Put files back
+            {chosen.size ? "Put files back" : "Keep files"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

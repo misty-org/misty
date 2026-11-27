@@ -27,6 +27,19 @@ pub(super) async fn visual_browser(
         .get_webview(&webview_label(id)?)
         .ok_or("browser_context_closed")?;
     view.show().map_err(|e| e.to_string())?;
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+    {
+        let picture =
+            crate::browser::agent_pages::page_agent::picture(app, state, request).await?;
+        if picture["dataUrl"].is_string() {
+            observed["viewport"] = picture["view"].clone();
+            observed["image"] = picture;
+            return Ok(observed);
+        }
+        if picture["ok"] == false {
+            return Ok(picture);
+        }
+    }
     let size = view
         .size()
         .map_err(|e| e.to_string())?

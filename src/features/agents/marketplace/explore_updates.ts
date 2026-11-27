@@ -5,7 +5,9 @@ import { useSpeechModels, type HearingModelView } from "@/features/voice";
 import {
   registryShards,
   useRegistry,
+  type EntryOf,
   type ListingEntry,
+  type ListingKind,
   type PluginEntry,
 } from "@/native/registry";
 import { useRegistryEngineIds, useRegistryEngines } from "./engine_catalog";
@@ -140,7 +142,7 @@ export function usePluginUpdates() {
   return { rows, reload: () => void records.reload() };
 }
 
-export function useMyAppsCount(spaceId: string) {
+export function useInstalledCount(spaceId: string) {
   const downloads = useDownloads(spaceId);
   const apps = useAppUpdates(spaceId).rows.length;
   const skills = useSkillUpdates().rows?.length ?? 0;
@@ -150,4 +152,24 @@ export function useMyAppsCount(spaceId: string) {
   return (
     downloads.apps.length + downloads.speech.length + apps + skills + engines + speech + plugins
   );
+}
+
+export function useFoundEntries<K extends ListingKind>(kind: K, ids: readonly string[]) {
+  const [found, setFound] = useState<EntryOf<K>[]>([]);
+  const key = [...new Set(ids)].sort().join(",");
+  useEffect(() => {
+    if (!key) {
+      setFound([]);
+      return;
+    }
+    let live = true;
+    registryShards.find(kind, key.split(",")).then(
+      (entries) => live && setFound(entries),
+      () => live && setFound([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [kind, key]);
+  return found;
 }

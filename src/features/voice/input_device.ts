@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createDeviceSetting } from "@/shared/lib/device_setting";
 
-export const savedInputDevice = createDeviceSetting<string>({
+export const useSavedInputDevice = createDeviceSetting<string>({
   scope: "voice-input-device",
   defaults: "",
   normalize: (stored) => (typeof stored === "string" ? stored.trim() : ""),

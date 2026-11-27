@@ -15,6 +15,8 @@
 
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(target_os = "macos")]
+mod scenario;
 
 fn main() {
     #[cfg(target_os = "macos")]
@@ -32,6 +34,7 @@ fn main() {
 /// What to load and which runtime operation to run there.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 struct Options {
+    scenario: Option<std::path::PathBuf>,
     url: String,
     operation: String,
     args: serde_json::Value,
@@ -40,15 +43,27 @@ struct Options {
 
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn options() -> Result<Options, String> {
-    const USAGE: &str = "usage: harness-host <url> [operation] [args-json] [--keep-open]";
+    const USAGE: &str = "usage: harness-host <url> [operation] [args-json] [--keep-open]\n       harness-host --scenario <file.json> [--keep-open]";
     let mut keep_open = false;
     let mut positional = Vec::new();
-    for arg in std::env::args().skip(1) {
+    let mut args_in = std::env::args().skip(1);
+    let mut scenario = None;
+    while let Some(arg) = args_in.next() {
         match arg.as_str() {
+            "--scenario" => scenario = Some(std::path::PathBuf::from(args_in.next().ok_or(USAGE)?)),
             "--keep-open" => keep_open = true,
             "-h" | "--help" => return Err(USAGE.into()),
             _ => positional.push(arg),
         }
+    }
+    if scenario.is_some() {
+        return Ok(Options {
+            scenario,
+            url: String::new(),
+            operation: String::new(),
+            args: serde_json::json!({}),
+            keep_open,
+        });
     }
     let mut positional = positional.into_iter();
     let url = positional.next().ok_or(USAGE)?;
@@ -66,6 +81,7 @@ fn options() -> Result<Options, String> {
         .entry("candidateId")
         .or_insert_with(|| serde_json::Value::from(format!("doc-{}", std::process::id())));
     Ok(Options {
+        scenario: None,
         url,
         operation,
         args,

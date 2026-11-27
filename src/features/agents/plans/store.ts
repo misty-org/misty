@@ -13,6 +13,7 @@ import type {
   ConversationMode,
   PermissionMode,
 } from "./plan_types";
+import { notify } from "@misty/ui";
 
 const empty = (): ConversationCollaboration => ({
   mode: "act",
@@ -185,7 +186,9 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
         ...(leavesPlan ? { permissionMode: "" } : {}),
       }));
       if (leavesPlan)
-        await collaborationApi.setPermissionMode(plan.conversationId, "").catch(() => undefined);
+        await collaborationApi
+          .setPermissionMode(plan.conversationId, "")
+          .catch(() => notify({ message: "Couldn't switch out of plan mode.", tone: "error" }));
       return result.prompt;
     },
     async revisePlan(plan, payload) {

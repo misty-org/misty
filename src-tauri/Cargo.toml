@@ -34,6 +34,8 @@ nucleo-matcher = "0.3"
 regex = "1"
 # A small local HTTP server: routing, state/path extractors and raw responses.
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+# Misty's own MCP server for the engines: the official Rust MCP SDK over Streamable HTTP (Apache-2.0).
+rmcp = { version = "3.12", default-features = false, features = ["server", "transport-streamable-http-server"] }
 arboard = "3.6.1"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -44,8 +46,8 @@ misty-credential-store = { path = "vendor/misty-credential-store" }
 browser_data = { path = "features/sync/browser_data" }
 agent-runs = { path = "features/agents/runs" }
 page_text = { path = "features/browser/page_text" }
-# The in-page agent runtime, from the sibling misty-browser-harness checkout.
-misty_page_runtime = { git = "https://github.com/misty-org/misty-browser-harness", rev = "304b7a969de0e9f3d3cf2c8c97be7e89f8ea5cd7" }
+# The in-page agent runtime, from the browser harness in harness/.
+misty_page_runtime = { path = "../harness/crates/page-runtime" }
 kiri = { path = "features/kiri" }
 file_access = { path = "features/file_access" }
 database = { path = "features/database" }
@@ -162,6 +164,8 @@ objc2-core-services = { version = "0.3.2", default-features = false, features = 
 # Tauri's wry resolve to; they move with Tauri.
 gtk = "0.18"
 webkit2gtk = { version = "=2.0", features = ["v2_40"] }
+# Cookies of agent tabs on WebKitGTK: the libsoup bindings webkit2gtk uses (MIT).
+soup = { package = "soup3", version = "0.5" }
 # Dictation's keys, pointer, front window and paste on X11 (MIT or Apache-2.0; enigo already
 # builds it with these extensions).
 x11rb = { version = "0.13", features = ["xtest"] }
@@ -234,8 +238,8 @@ opt-level = 3
 # document processing still uses catch_unwind for recovery. agents/run_control refuses to build
 # with panic=abort.
 [profile.release]
-codegen-units = 1
-lto = "fat"
+codegen-units = 16
+lto = "thin"
 opt-level = "s"
 strip = "symbols"
 

@@ -294,6 +294,38 @@ pub async fn files_read_head(
     blocking(move || read_head(&path, limit)).await
 }
 
+const MAX_PICKED: u64 = 100 * 1024 * 1024;
+
+pub(crate) fn read_picked(path: &Path) -> Result<Vec<u8>, String> {
+    let file = gated::open_read(path).map_err(|error| failed(path, io_text(&error)))?;
+    let meta = file
+        .metadata()
+        .map_err(|error| failed(path, io_text(&error)))?;
+    if meta.len() > MAX_PICKED {
+        return Err(failed(path, "it's larger than 100 MB"));
+    }
+    let mut bytes = Vec::with_capacity(meta.len() as usize);
+    file.take(MAX_PICKED + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| failed(path, io_text(&error)))?;
+    if bytes.len() as u64 > MAX_PICKED {
+        return Err(failed(path, "it's larger than 100 MB"));
+    }
+    Ok(bytes)
+}
+
+#[tauri::command]
+pub async fn files_read_bytes(
+    webview: tauri::Webview,
+    path: String,
+) -> Result<tauri::ipc::Response, String> {
+    person_window(&webview)?;
+    let path = asked_path(&path)?;
+    blocking(move || read_picked(&path))
+        .await
+        .map(tauri::ipc::Response::new)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

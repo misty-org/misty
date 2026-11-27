@@ -3,10 +3,12 @@ import { CallControl, MenuCheckItem, MenuItem, MenuSeparator } from "@misty/ui";
 import { DeviceChoices } from "./DeviceChoices";
 import {
   rememberSpeaker,
-  savedCallAudio,
+  useSavedCallAudio,
   savedCallDevice,
-  savedNoiseReduction,
+  useSavedNoiseReduction,
+  useSavedSpeaker,
 } from "./call_devices";
+import { useSavedInputDevice } from "@/features/voice";
 import { useCallStore, type LiveCallAudio } from "./call_store";
 
 type AudioDevices = Pick<
@@ -16,20 +18,20 @@ type AudioDevices = Pick<
 
 export function useCallAudio(): LiveCallAudio {
   const live = useCallStore((state) => state.audio);
-  const saved = savedCallAudio((state) => state.value);
-  const noiseReduction = savedNoiseReduction((state) => state.value);
-  const microphone = savedCallDevice.audioinput((state) => state.value);
-  const speaker = savedCallDevice.audiooutput((state) => state.value);
+  const saved = useSavedCallAudio((state) => state.value);
+  const noiseReduction = useSavedNoiseReduction((state) => state.value);
+  const microphone = useSavedInputDevice((state) => state.value);
+  const speaker = useSavedSpeaker((state) => state.value);
   if (live) return live;
   return {
     micOn: !saved.muted,
     deafened: saved.deafened,
     noiseReduction,
     toggleMic: () =>
-      savedCallAudio.getState().set((current) => ({ ...current, muted: !current.muted })),
+      useSavedCallAudio.getState().set((current) => ({ ...current, muted: !current.muted })),
     toggleDeafen: () =>
-      savedCallAudio.getState().set((current) => ({ ...current, deafened: !current.deafened })),
-    setNoiseReduction: (on: boolean) => savedNoiseReduction.getState().set(on),
+      useSavedCallAudio.getState().set((current) => ({ ...current, deafened: !current.deafened })),
+    setNoiseReduction: (on: boolean) => useSavedNoiseReduction.getState().set(on),
     activeDevice: (kind: "audioinput" | "audiooutput") =>
       kind === "audioinput" ? microphone : speaker,
     pickDevice: (kind: "audioinput" | "audiooutput", deviceId: string) => {

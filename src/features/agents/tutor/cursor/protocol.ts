@@ -63,11 +63,13 @@ export interface Presentation {
   words?: { count: number; rate: number; at: number };
   hint?: { text: string; first: boolean };
   handoff?: PresentedHandoff;
+  agent?: PresentedAgent;
 }
+export type PresentedAgent = Pick<AgentProfile, "id" | "name" | "engine" | "avatar">;
 export interface PresentedHandoff {
   task: string;
   conversationId: string;
-  agent: Pick<AgentProfile, "id" | "name" | "engine" | "avatar">;
+  agent: PresentedAgent;
   state: HandoffState;
 }
 export type HandoffState = "working" | "waiting" | "done" | "failed";

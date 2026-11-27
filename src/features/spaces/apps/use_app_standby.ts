@@ -55,7 +55,12 @@ export function useAppStandby(spaceId: string | undefined) {
         instance: "",
         appId,
         appName,
-        screen: { command: () => Promise.reject(new Error("closed")), dispose: () => {} },
+        screen: {
+          command: () => Promise.reject(new Error("closed")),
+          onTools: () => () => {},
+          onPoint: () => () => {},
+          dispose: () => {},
+        },
         frame: () => null,
       });
       const standby = definitions.map((definition) => ({

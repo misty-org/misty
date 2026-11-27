@@ -59,12 +59,7 @@ export function useConversationTurnActions(
     useMistyStore.getState().rewindConversation(conversationId, fromMessageId);
     return true;
   };
-  const retryPrompt = useStableCallback((prompt: string, fromMessageId?: string) => {
-    void (async () => {
-      if (fromMessageId && conversation?.id && !(await rewindTo(fromMessageId))) return;
-      send(prompt, false);
-    })();
-  });
+  const retryPrompt = useStableCallback((prompt: string) => send(prompt, false));
   const resumeLedger = useStableCallback(
     (messageId: string, rows: LedgerRow[], only?: string[]) => {
       const messages = conversation?.messages ?? [];

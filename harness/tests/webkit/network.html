@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Network</title></head>
+<body>
+  <button id="load" onclick="load()">Load results</button>
+  <button id="send" onclick="send()">Check status</button>
+  <ul id="results"></ul>
+  <p id="sent"></p>
+  <script>
+    async function load() {
+      const answer = await fetch("/data/slow.json?ms=1200");
+      const items = await answer.json();
+      document.getElementById("results").innerHTML = items.map((item) => `<li>${item}</li>`).join("");
+    }
+    function postNote() {
+      fetch("/data/slow.json?ms=10", { method: "POST", headers: { "Authorization": "Bearer secret-token", "Content-Type": "application/json", "X-Client": "notes" }, body: JSON.stringify({ note: "hello" }) });
+    }
+    function send() {
+      const request = new XMLHttpRequest();
+      request.open("post", "/missing.json");
+      request.onloadend = () => { document.getElementById("sent").textContent = "Sent " + request.status; };
+      request.send("{}");
+    }
+  </script>
+</body></html>

@@ -344,21 +344,14 @@ pub async fn pet_get_package(id: String) -> Result<PetPackage, String> {
 }
 
 #[tauri::command]
-pub async fn pet_import(app: AppHandle) -> Result<Option<PetSummary>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title("Choose a pet folder")
-        .pick_folder(move |folder| {
-            let _ = send.send(folder);
-        });
-    let Some(folder) = receive.await.ok().flatten() else {
+pub async fn pet_import(
+    app: AppHandle,
+    webview: tauri::Webview,
+) -> Result<Option<PetSummary>, String> {
+    let pick = crate::files::pick::Pick::folder("Choose a pet folder");
+    let Some(folder) = crate::files::pick::pick_one(&webview, pick).await? else {
         return Ok(None);
     };
-    let folder = folder
-        .into_path()
-        .map_err(|_| "Choose a folder on this computer.".to_string())?;
     let imported = blocking(move || import_from(&folder)).await?;
     let id = imported.id.clone();
     let settings = change_settings(&app, |settings| settings.pet_id = id.clone())?;

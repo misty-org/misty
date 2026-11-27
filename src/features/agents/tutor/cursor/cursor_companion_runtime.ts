@@ -10,6 +10,9 @@ import {
 } from "./companion_state";
 import type { CompanionClick } from "./companion_guide";
 import { createCompanionControl } from "./cursor_companion_control";
+import { cursorFace } from "./cursor_agent";
+import { agentInAnApp, useAgentsInApps } from "./agents_in_apps";
+import { usePersonalAgentsStore } from "../../personal/personal_agents_store";
 import { CursorCompanionSession } from "./cursor_companion_session";
 import { CursorCompanionTypedTurns } from "./cursor_companion_typed";
 import { CursorCompanionVoice } from "./cursor_companion_voice";
@@ -26,6 +29,17 @@ export function startCursorCompanion(accountId: string) {
   s.pointer.onStep = (step) => void typed.continueGuide(step).catch((e) => s.fail(s.turn, e));
   const stopPreferences = useDevicePreferences.subscribe(s.applyPreferences);
   s.applyPreferences();
+  let onCallNow = false;
+  const stepAway = () => {
+    const now = onCallNow || agentInAnApp(s.state.agent?.id);
+    if (!s.disposed && Boolean(s.state.spriteAway) !== now) s.change({ spriteAway: now });
+  };
+  const stopAgents = usePersonalAgentsStore.subscribe(() => {
+    const agent = cursorFace();
+    if (JSON.stringify(agent) !== JSON.stringify(s.state.agent)) s.change({ agent });
+    stepAway();
+  });
+  const stopApps = useAgentsInApps.subscribe(stepAway);
   const unsubscribe = useMistyStore.subscribe(() => {
     if (s.conversationScope && !s.creatingConversation && !s.originIsCurrent(s.conversationScope)) {
       s.closeConversationVoice();
@@ -40,7 +54,8 @@ export function startCursorCompanion(accountId: string) {
   const away = setInterval(() => {
     if (!s.nativeReady || !s.state.sprite || s.state.visible || s.state.phase !== "idle") return;
     void onCall().then((busy) => {
-      if (!s.disposed && Boolean(s.state.spriteAway) !== busy) s.change({ spriteAway: busy });
+      onCallNow = busy;
+      stepAway();
     });
   }, callCheckMs);
   return () => {
@@ -48,6 +63,8 @@ export function startCursorCompanion(accountId: string) {
     s.disposed = true;
     s.pointer.cancel();
     stopPreferences();
+    stopAgents();
+    stopApps();
     unsubscribe();
     s.stopAudio();
     s.closeConversationVoice();

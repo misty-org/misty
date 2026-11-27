@@ -13,13 +13,12 @@ import {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "@/features/app-windows";
-import { cn, Separator, Surface } from "@misty/ui";
+import { cn, Surface } from "@misty/ui";
 import { designPx, uiPx } from "@misty/ui";
-import { dockingMetrics } from "./docking_geometry";
 
-const lightsDrop = () =>
-  uiPx(dockingMetrics.edge + dockingMetrics.spaceBar / 2) - trafficLightRestY;
+const lightsDrop = () => uiPx(sidebarHeadCenter) - trafficLightRestY;
 const lightsInset = 2;
+const sidebarHeadCenter = 24;
 
 const edgeZone = 8;
 const hideDelayMs = 180;
@@ -28,7 +27,6 @@ const sidebarCloseDistance = 70;
 export function SidebarDrawer(props: {
   side: "left" | "right";
   gridColumn: number;
-  rail?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -133,9 +131,7 @@ export function SidebarDrawer(props: {
       className={cn(
         "misty-sidebar-drawer",
         "[--sidebar-w:max(calc(var(--spacing)_*_70),min(var(--shell-side-tabs,calc(var(--spacing)*70)),calc(100vw_-_var(--spacing)_*_60)))]",
-        props.rail
-          ? "[--rail-w:calc(var(--pane-frame,calc(var(--spacing)*1.5))_+_var(--spacing)_*_16)]"
-          : "[--rail-w:0px]",
+        "[--rail-w:0px]",
         "relative flex-none transition-[width]",
         motion,
         collapsed ? "w-0" : "w-[calc(var(--rail-w)_+_var(--sidebar-w))]",
@@ -162,7 +158,7 @@ export function SidebarDrawer(props: {
         ref={panel}
         className={cn(
           "absolute top-0 bottom-0 z-[var(--stack-overlay-raised)] flex flex-col w-[calc(var(--rail-w)_+_var(--sidebar-w))]",
-          "py-[var(--pane-frame,calc(var(--spacing)*1.5))] transition-[transform,visibility]",
+          "pb-[var(--pane-frame,calc(var(--spacing)*1.5))] transition-[transform,visibility]",
           motion,
           left ? "left-0" : "right-0",
           hidden &&
@@ -177,21 +173,11 @@ export function SidebarDrawer(props: {
         inert={hidden ? true : undefined}
       >
         <div className={cn("flex min-h-0 flex-1", !left && "flex-row-reverse")}>
-          {props.rail}
           <div ref={sidebar} className="relative flex min-h-0 min-w-0 flex-1">
             {props.children}
           </div>
         </div>
         {props.footer}
-        {collapsed ? null : (
-          <Separator
-            orientation="vertical"
-            className={cn(
-              "pointer-events-none absolute top-0 bottom-0",
-              left ? "right-0" : "left-0",
-            )}
-          />
-        )}
       </Surface>
       {collapsed ? null : (
         <div

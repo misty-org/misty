@@ -52,7 +52,7 @@ pub async fn projects_home_choose(
 ) -> Result<Option<String>, String> {
     person_window(&webview)?;
     let Some(folder) =
-        pick_folder_from(&app, "Choose where your projects go", dirs::home_dir()).await?
+        pick_folder_from(&webview, "Choose where your projects go", dirs::home_dir()).await?
     else {
         return Ok(None);
     };
@@ -79,7 +79,7 @@ pub async fn project_parent_pick(
     }
     .map(PathBuf::from)
     .or_else(dirs::home_dir);
-    let Some(folder) = pick_folder_from(&app, "Choose where this project goes", start).await?
+    let Some(folder) = pick_folder_from(&webview, "Choose where this project goes", start).await?
     else {
         return Ok(None);
     };

@@ -10,27 +10,25 @@ import {
 import { ArrowLeft, RefreshCw, Smile, X } from "lucide-react";
 import type { SpaceMessage } from "../../api/dto/entities";
 import {
-  Avatar,
-  AvatarFallback,
+  PaneLoading,
   ChannelDivider,
   ChannelMessage,
   ChannelMessageText,
+  composerDockClass,
   FramedBar,
   IconButton,
+  TypingLine,
   MessageComposer,
   MessageComposerSend,
-  PaneLoading,
   Text,
-  TypingLine,
 } from "@misty/ui";
-import { AgentMark } from "@/features/agents";
 import {
   buildChatDisplayRows,
   memberOutlineFor,
   useMemberAvatarUrls,
   useMemberOutlines,
 } from "./ChatDisplay";
-import { ChatAvatar } from "./ChatAvatar";
+import { ChatAgentAvatar, ChatAvatar } from "./ChatAvatar";
 import { Span } from "./ChatMessageParts";
 import { isAgentAuthoredMessage } from "./message_text";
 import { useChatSidePanel } from "../chat_side_panel_store";
@@ -170,15 +168,15 @@ export function ChatThreadColumn({
         data-message-id={message.id}
         data-delivery={message.local_delivery_state}
         name={message.sender_name}
-        color={memberColors?.get(message.sender_user_id)}
+        color={agent ? undefined : memberColors?.get(message.sender_user_id)}
         grouped={grouped}
         avatar={
           agent ? (
-            <Avatar size="lg">
-              <AvatarFallback>
-                <AgentMark agentId={message.sender_agent_id} />
-              </AvatarFallback>
-            </Avatar>
+            <ChatAgentAvatar
+              agentId={message.sender_agent_id}
+              name={message.sender_name}
+              size="lg"
+            />
           ) : (
             <ChatAvatar
               id={message.sender_user_id || message.sender_name}
@@ -258,11 +256,11 @@ export function ChatThreadColumn({
         ) : null}
       </div>
       {canWrite && root ? (
-        <section aria-label="Reply composer" className="shrink-0 px-4 pb-1">
+        <section aria-label="Reply composer" className={composerDockClass}>
           <TypingLine label={typingLabel || undefined} />
           <form ref={form} onSubmit={submit}>
             <MessageComposer
-              variant="card"
+              variant="dock"
               inputRef={textarea}
               inputProps={{
                 "aria-label": "Reply",

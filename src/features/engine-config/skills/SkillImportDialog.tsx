@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-import { open } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
+import { pickPaths } from "@/shared/lib/file_pick";
 import {
   Button,
   Checkbox,
@@ -44,8 +44,8 @@ export function SkillImportDialog({
 
   const pick = async () => {
     setPickerError(null);
-    const picked = await open({ directory: true, multiple: false, title: t("import.pickTitle") });
-    if (typeof picked !== "string") return;
+    const [picked] = await pickPaths({ folders: true, title: t("import.pickTitle") });
+    if (!picked) return;
     const mapped = relativeToRoot(picked, targets);
     if (!mapped) {
       setPickerError(t("import.outsideRoots", { roots }));

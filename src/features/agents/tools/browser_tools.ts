@@ -88,10 +88,17 @@ async function attachmentDetails(file: { id: string; name: string }) {
   }
 }
 
-async function uploadConfig(entry: RunEntry, input: Record<string, unknown>) {
+async function uploadConfig(entry: RunEntry, input: Record<string, unknown>, runId: string) {
   const target = [input.elementRef, input.ref].filter(Boolean);
   if (target.length !== 1) throw argumentsInvalid();
-  const { attachmentId, downloadId, sourceScopeId } = input as Record<string, string | undefined>;
+  const { attachmentId, downloadId, sourceScopeId, path } = input as Record<
+    string,
+    string | undefined
+  >;
+  if (path !== undefined) {
+    if (attachmentId || downloadId || sourceScopeId || !path.trim()) throw argumentsInvalid();
+    return { workingFile: { runId, path } };
+  }
   if (downloadId && sourceScopeId && !attachmentId) {
     if (!entry.agentId || !entry.taskId || !browserScopeAllowed(entry, sourceScopeId)) {
       throw notAllowed();
@@ -131,7 +138,7 @@ export async function runBrowserTool(request: LocalToolRequest, started: RunEntr
     ...browserToolConfig(entry, request.policyCall),
     taskId: scopeTaskId(entry, scopeId),
     ...(name === screenAct ? { surface } : {}),
-    ...(name === "browser.upload" ? await uploadConfig(entry, request.input) : {}),
+    ...(name === "browser.upload" ? await uploadConfig(entry, request.input, request.runId) : {}),
   };
   if (name === "browser.extract") checkExtractRequest(request.input);
   if (name === "browser.navigate") await addressWithoutHost(String(request.input.url ?? ""));

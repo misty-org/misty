@@ -1,6 +1,7 @@
 import "./presence_mirror";
 export { DirectRoot } from "./DirectRoot";
 export { DirectSurface } from "./DirectSurface";
+export { GroupFace } from "./GroupFace";
 export {
   directApi,
   type AccountStatus,
@@ -11,12 +12,24 @@ export {
   type PresenceStatus,
 } from "./api";
 export {
+  agentDmClosed,
+  closeAgentDm,
+  closeDm,
+  dmClosed,
+  reopenAgentDm,
+  renameDm,
+  useDmLocal,
+  useDmNames,
+} from "./dm_local";
+export {
+  dmMembersName,
   dmName,
   dmOthers,
   dmPath,
   friendsRoute,
   reloadDms,
   reloadFriends,
+  renameGroupDm,
   useDmListUpdates,
   useDms,
   useFriends,

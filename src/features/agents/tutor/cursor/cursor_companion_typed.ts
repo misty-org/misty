@@ -112,6 +112,7 @@ export class CursorCompanionTypedTurns {
           turn: generation,
           executionMode: "user",
           interactionMode: s.state.mode,
+          cursor: voiceOwned,
           ...(screens.length ? { displayCaptures: screens } : {}),
           continuation: request.continuation,
           ...(s.state.teach ? { collaborationMode: "teach" as const } : {}),

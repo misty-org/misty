@@ -51,12 +51,15 @@ export function useAgentsPageState() {
   useEffect(() => {
     setSelected(undefined);
     setSettingsModalOpen(false);
-    void load(accountId);
+    const agentsNow = usePersonalAgentsStore.getState();
+    if (agentsNow.accountId !== accountId || (!agentsNow.agents.length && !agentsNow.loading))
+      void load(accountId);
   }, [accountId, load]);
   useEffect(() => {
     const store = useMistyStore.getState();
     store.setAccount(accountId);
-    void store.loadConversations();
+    if (accountId && !store.working && !store.conversations.length && !store.conversationsLoading)
+      void store.loadConversations();
   }, [accountId]);
   useAgentFolderSync(accountId);
   const shownAgentId = useRef<string | undefined>(undefined);
@@ -218,11 +221,10 @@ export type AgentsPageState = ReturnType<typeof useAgentsPageState>;
 
 const workspacePageTitles: Record<Exclude<AgentWorkspacePage, "task">, string> = {
   files: "Files",
-  memory: "Memory",
 };
 
 function pageFromView(view: string): AgentWorkspacePage | undefined {
-  if (view === "files" || view === "memory") return view;
+  if (view === "files") return view;
   return undefined;
 }
 

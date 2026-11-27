@@ -1,0 +1,19 @@
+{
+  "page": "webmcp.html",
+  "run": [
+    {"name": "the page's tools are listed", "op": "page_tools", "input": {},
+     "expect": {"ok": true, "tools": [{"name": "list_todos", "annotations": {"readOnlyHint": true}}, {"name": "add_todo", "description": "Adds a todo."}, {"name": "broken"}]}},
+    {"name": "a tool that changes things asks first", "op": "page_tools", "input": {"action": "call", "name": "add_todo", "args": {"text": "Milk"}},
+     "expect": {"tool_error": {"code": "browser_consequential_requires_approval"}}},
+    {"name": "nothing was added", "op": "page", "js": "return todos.length", "expect": 0},
+    {"name": "with the person's task it runs", "op": "page_tools", "input": {"action": "call", "name": "add_todo", "args": {"text": "Milk"}, "allowConsequential": true},
+     "expect": {"ok": true, "result": {"added": "Milk", "count": 1}, "contentTrust": "untrusted-web-page"}},
+    {"name": "the page shows it", "op": "snapshot", "expect": {"tree": "~Milk"}},
+    {"name": "a read-only tool runs at once", "op": "page_tools", "input": {"action": "call", "name": "list_todos"},
+     "expect": {"ok": true, "result": {"todos": ["Milk"]}}},
+    {"name": "a failing tool says so", "op": "page_tools", "input": {"action": "call", "name": "broken"},
+     "expect": {"tool_error": {"code": "browser_page_tool_failed", "message": "~Nope"}}},
+    {"name": "a missing tool", "op": "page_tools", "input": {"action": "call", "name": "nothing"},
+     "expect": {"tool_error": {"code": "browser_page_tool_missing"}}}
+  ]
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { RotateCw } from "lucide-react";
 import {
   AddReactionButton,
@@ -14,11 +14,13 @@ import {
   ToolList,
   ToolPath,
   ToolRow,
+  TurnFold,
   notify,
 } from "@misty/ui";
 import { personTone } from "@/shared/lib/person_tone";
 import { personInitials } from "@/shared/lib/person_initials";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
+import { Fold } from "../progress/WorkGroup";
 import { continueThread } from "./continuation";
 import { memberFace } from "./member_face";
 import { reactionPicker } from "@/shared/lib/reaction_picker";
@@ -50,6 +52,25 @@ function stepRows(body: string) {
         </li>
       );
     });
+}
+
+function FoldedSteps({ body }: { body: string }) {
+  const [open, setOpen] = useState(false);
+  const stepsId = useId();
+  const rows = stepRows(body);
+  return (
+    <div className="grid gap-1">
+      <TurnFold
+        summary={rows.length === 1 ? "1 step" : `${rows.length} steps`}
+        open={open}
+        onToggle={() => setOpen(!open)}
+        controls={stepsId}
+      />
+      <Fold id={stepsId} open={open} onReveal={() => setOpen(true)}>
+        <ToolList label="Steps">{rows}</ToolList>
+      </Fold>
+    </div>
+  );
 }
 
 function outputRows(body: string) {
@@ -177,7 +198,7 @@ export function SharedThreadView(props: {
               ) : entry.kind === "reply" ? (
                 <MistyMarkdown>{entry.body}</MistyMarkdown>
               ) : entry.kind === "step" ? (
-                <ToolList label="Steps">{stepRows(entry.body)}</ToolList>
+                <FoldedSteps body={entry.body} />
               ) : (
                 <ToolList label="What it made">{outputRows(entry.body)}</ToolList>
               )}

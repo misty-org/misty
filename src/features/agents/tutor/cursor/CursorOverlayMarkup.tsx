@@ -106,7 +106,7 @@ export function CursorOverlayMarkup({
       >
         {presentation.sprite === true && (
           <Pressable
-            aria-label="Ask Misty"
+            aria-label={presentation.agent ? `Ask ${presentation.agent.name}` : "Ask Misty"}
             tabIndex={-1}
             className={cn(
               "cursor-misty absolute size-8 -translate-x-1/2 -translate-y-1/2",
@@ -116,11 +116,18 @@ export function CursorOverlayMarkup({
             onClick={() => void invoke("cursor_companion_ask_open").catch(() => undefined)}
           >
             <div
-              className={cn("size-full", screenMarkClass.companion)}
+              className={cn(
+                "flex size-full items-center justify-center",
+                screenMarkClass.companion,
+              )}
               data-phase={presentation.phase}
               data-wave={presentation.wave ? "" : undefined}
             >
-              <AgentCloudImage variant={mistyCloud} fill />
+              {presentation.agent ? (
+                <AgentAvatar agent={presentation.agent as AgentProfile} size="sm" />
+              ) : (
+                <AgentCloudImage variant={mistyCloud} fill />
+              )}
             </div>
           </Pressable>
         )}

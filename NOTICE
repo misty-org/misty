@@ -77,6 +77,14 @@ lobe-icons (https://github.com/lobehub/lobe-icons)
 
   Copyright (c) 2023 LobeHub
 
+Clicky, by Farza
+  The cursor's screen capture (src-tauri/features/agents/cursor/macos/companion_capture.rs) is
+  adapted from its CompanionScreenCaptureUtility.swift.
+
+  MIT License
+
+  Copyright (c) 2026 Farza
+
 LiteLLM (https://github.com/BerriAI/litellm)
   Its model price table (model_prices_and_context_window.json) is bundled as
   src-tauri/features/engine_config/usage_stats/model-prices.json and refreshed from its repository
@@ -313,6 +321,20 @@ wry and tao (https://github.com/tauri-apps/wry, https://github.com/tauri-apps/ta
   Dependencies of harness/crates/host, under Apache-2.0 or MIT. The host's window and event loop follow
   wry's `simple` example.
 
+Playwright (https://github.com/microsoft/playwright)
+  harness/crates/page-runtime/js/vendor_playwright_roles.js is Playwright's roleUtils.ts and what it
+  imports (domUtils.ts, cssTokenizer.ts), bundled unchanged from microsoft/playwright@c2ebabaf by
+  harness/scripts/vendor_playwright.mjs: the accessible names, roles and ARIA states every snapshot
+  uses. The harness's tool surface and step answers follow Playwright's MCP server
+  (packages/playwright-core/src/tools/backend). Under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0), with Playwright's notice:
+
+    Playwright
+    Copyright (c) Microsoft Corporation
+
+    This software contains code derived from the Puppeteer project
+    (https://github.com/puppeteer/puppeteer), available under the Apache 2.0 license.
+
 browser-use (https://github.com/browser-use/browser-use)
   harness/crates/page-runtime/js/page_effects.js follows browser-use's browser_use/ax.py: the effect probe
   (a token per document and a filtered count of DOM mutations and form events) and the compact
@@ -383,3 +405,7 @@ BU Bench (https://github.com/browser-use/benchmark)
   The BU Bench repository states no license of its own; its README asks that decrypted
   tasks and rubrics are never published or used for training, and this repository keeps run data
   out of version control.
+
+Twemoji (https://github.com/jdecked/twemoji)
+  Misty draws emoji with @misty/ui's bundled Twemoji drawings, by Twitter, Inc and other
+  contributors, licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/

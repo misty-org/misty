@@ -77,7 +77,7 @@ fn a_question_shows_until_the_run_moves_on() {
     let row = &rows(&connection, "me", &chats(&["c1"]), 10).unwrap()[0];
     assert_eq!(row.state, "running");
     assert_eq!(row.engine, "misty");
-    assert_eq!(row.mode, "ask");
+    assert_eq!(row.mode, "auto");
 }
 
 #[test]

@@ -302,6 +302,18 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "agents.companion.agent",
+    "label": "Agent on the cursor",
+    "page": "agents-companion",
+    "section": "companion",
+    "key": "agent",
+    "default": "",
+    "type": "string",
+    "owner": "device",
+    "platforms": ["desktop"],
+    "maxLength": 128
+  },
+  {
     "id": "agents.companion.size",
     "label": "Companion size",
     "page": "agents-companion",

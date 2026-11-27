@@ -3,7 +3,9 @@
 //! just the paths that changed. The walk is the disk gate's own (`walk`), over checked folder
 //! handles that never follow a link and skip closed places. Walked entries are compared with the
 //! manifest read-only, and the index's one writer is touched only once a change appears, so an
-//! unchanged tree costs reads alone.
+//! unchanged tree costs reads alone. The whole walk goes one top folder of home at a time, saving
+//! after each, so a walk cut short (Misty quit, the person turned indexing off) picks up after the
+//! last folder it finished, with the disk's events since it began replayed over the rest.
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     ffi::OsString,
@@ -229,17 +231,86 @@ fn walk(
     walked.map_err(|error| super::super::failed(start, error))
 }
 
+fn top_folders(
+    home: &Path,
+    filter: &ScanFilter,
+    sink: &mut Sink<'_>,
+    keep_going: &dyn Fn() -> bool,
+) -> Result<Vec<String>, String> {
+    let mut folders = Vec::new();
+    let mut failure: Option<String> = None;
+    let mut visit = |step: file_access::disk::WalkStep<'_>| -> io::Result<WalkFlow> {
+        if !keep_going() {
+            failure = Some(STOPPED.to_owned());
+            return Ok(WalkFlow::Stop);
+        }
+        let path = step.dir.path().join(&step.item.name);
+        let folder = step.item.kind == ItemKind::Dir;
+        if folder && filter.excludes(&path) {
+            return Ok(WalkFlow::SkipDir);
+        }
+        if let Some(doc) = kind_doc(&path, step.item.kind, step.item.len, step.item.modified) {
+            if let Err(error) = sink.accept(doc) {
+                failure = Some(error);
+                return Ok(WalkFlow::Stop);
+            }
+        }
+        if folder {
+            folders.push(step.item.name.to_string_lossy().into_owned());
+            return Ok(WalkFlow::SkipDir);
+        }
+        Ok(WalkFlow::Continue)
+    };
+    let walked = walk_checked(home, Access::Read, WalkFor::Person, &mut visit);
+    if let Some(failure) = failure {
+        return Err(failure);
+    }
+    walked.map_err(|error| super::super::failed(home, error))?;
+    folders.sort();
+    Ok(folders)
+}
+
+fn top_part<'p>(home: &Path, path: &'p str) -> Option<&'p str> {
+    let home = home.to_string_lossy();
+    let rest = path.strip_prefix(home.as_ref())?;
+    let rest = rest.trim_start_matches(['/', '\\']);
+    Some(rest.split(['/', '\\']).next().unwrap_or(rest))
+}
+
 pub(super) fn scan(
     catalog: &mut Catalog,
     home: &Path,
+    resume_after: Option<&str>,
     keep_going: &dyn Fn() -> bool,
     publish: &dyn Fn(),
+    part_done: &mut dyn FnMut(&Catalog, &str) -> Result<(), String>,
 ) -> Result<Changes, String> {
     let filter = ScanFilter::new(home);
     let mut sink = Sink::new(catalog, publish);
     let mut pacer = Pacer::default();
-    walk(home, 0, &filter, &mut sink, &mut pacer, keep_going)?;
-    sink.remove_missing(&home.to_string_lossy())?;
+    let folders = top_folders(home, &filter, &mut sink, keep_going)?;
+    let mut skipped: HashSet<String> = HashSet::new();
+    for name in &folders {
+        if resume_after.is_some_and(|done| name.as_str() <= done) {
+            skipped.insert(name.clone());
+            continue;
+        }
+        let path = home.join(name);
+        walk(&path, 1, &filter, &mut sink, &mut pacer, keep_going)?;
+        sink.remove_unseen(&path.to_string_lossy())?;
+        sink.commit()?;
+        part_done(&*sink.catalog, name)?;
+    }
+    if skipped.is_empty() {
+        sink.remove_missing(&home.to_string_lossy())?;
+    } else {
+        let missing = catalog::paths_below(&sink.catalog.manifest, &home.to_string_lossy())?
+            .into_iter()
+            .filter(|path| !sink.seen.contains(&key_hash(path)))
+            .filter(|path| top_part(home, path).is_none_or(|part| !skipped.contains(part)))
+            .collect();
+        sink.remove(missing)?;
+    }
     sink.finish()
 }
 

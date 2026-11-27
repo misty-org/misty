@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { X } from "lucide-react";
-import { Button, IconButton, Spinner, Text, Tooltip, rowShape, cn } from "@misty/ui";
+import { Button, IconButton, Text, Tooltip, rowShape, cn } from "@misty/ui";
 import { useWorktreeStore, type PendingCreation } from "./worktree_store";
 
 const ERROR_TEXT: Record<string, string> = {
@@ -74,9 +74,6 @@ export function WorktreeProgressRow({ pending }: { pending: PendingCreation }) {
 
   return (
     <div className={rowClass}>
-      <Text bare tone="muted" className="flex shrink-0">
-        <Spinner size="sm" label={false} />
-      </Text>
       <Text tone="muted" className="flex-1">
         {stageText(pending)}
       </Text>

@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { createDeviceSetting } from "@/shared/lib/device_setting";
 
-export type ContextPanelTab = "session" | "steps" | "files" | "changes" | "terminal" | "profile";
+export type ContextPanelTab =
+  "session" | "goal" | "steps" | "files" | "changes" | "terminal" | "memory" | "profile";
 
 export type ContextPanelSurface = Exclude<ContextPanelTab, "session">;
 
@@ -13,47 +14,47 @@ export const CHAT_MIN_WIDTH = 360;
 export const useContextPanel = create<{
   tab: ContextPanelSurface | null;
   session: boolean;
-  sessionTucked: boolean;
   expanded: boolean;
   toggle(tab: ContextPanelTab): void;
   show(tab: ContextPanelTab): void;
   close(): void;
   closeSession(): void;
-  setSessionTucked(tucked: boolean): void;
   toggleExpanded(): void;
 }>((set, get) => ({
   tab: null,
   session: false,
-  sessionTucked: false,
   expanded: false,
   toggle: (tab) =>
     tab === "session"
-      ? get().session && get().sessionTucked
-        ? set({ sessionTucked: false })
-        : set({ session: !get().session })
+      ? set({ session: !get().session })
       : set({ tab: get().tab === tab ? null : tab, expanded: false }),
-  show: (tab) => (tab === "session" ? set({ session: true, sessionTucked: false }) : set({ tab })),
+  show: (tab) => (tab === "session" ? set({ session: true }) : set({ tab })),
   close: () => set({ tab: null, expanded: false }),
   closeSession: () => set({ session: false }),
-  setSessionTucked: (sessionTucked) => set({ sessionTucked }),
   toggleExpanded: () => set({ expanded: !get().expanded }),
 }));
 
 interface SavedContextPanel {
   tab: ContextPanelSurface | null;
   session: boolean;
-  sessionTucked: boolean;
   expanded: boolean;
 }
 
-const surfaces: ContextPanelSurface[] = ["steps", "files", "changes", "terminal", "profile"];
+const surfaces: ContextPanelSurface[] = [
+  "goal",
+  "steps",
+  "files",
+  "changes",
+  "terminal",
+  "memory",
+  "profile",
+];
 
 const savedPanel = createDeviceSetting<SavedContextPanel>({
   scope: "context-panel",
   defaults: {
     tab: null,
     session: false,
-    sessionTucked: false,
     expanded: false,
   },
   normalize: (stored) => {
@@ -62,7 +63,6 @@ const savedPanel = createDeviceSetting<SavedContextPanel>({
     return {
       tab,
       session: saved.session === true,
-      sessionTucked: saved.sessionTucked === true,
       expanded: Boolean(tab) && saved.expanded === true,
     };
   },
@@ -89,21 +89,14 @@ useContextPanel.subscribe((state, previous) => {
   if (
     state.tab === previous.tab &&
     state.session === previous.session &&
-    state.sessionTucked === previous.sessionTucked &&
     state.expanded === previous.expanded
   )
     return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { tab, session, sessionTucked, expanded } = useContextPanel.getState();
+    const { tab, session, expanded } = useContextPanel.getState();
     const saved = savedPanel.getState().value;
-    if (
-      saved.tab === tab &&
-      saved.session === session &&
-      saved.sessionTucked === sessionTucked &&
-      saved.expanded === expanded
-    )
-      return;
-    savedPanel.getState().set({ tab, session, sessionTucked, expanded });
+    if (saved.tab === tab && saved.session === session && saved.expanded === expanded) return;
+    savedPanel.getState().set({ tab, session, expanded });
   }, 250);
 });

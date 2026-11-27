@@ -11,9 +11,6 @@ import {
 } from "lucide-react";
 import {
   AddReactionButton,
-  Avatar,
-  AvatarFallback,
-  Badge,
   ChannelMessage,
   ChannelMessageText,
   ChannelReactions,
@@ -27,23 +24,20 @@ import {
   MenuItem,
   MenuSeparator,
   ReactionChip,
-  Text,
   ThreadRepliesButton,
   useNotice,
 } from "@misty/ui";
-import { AgentMark } from "@/features/agents";
-import { useSpacesStore } from "../../list/use_spaces_store";
 import { LinkPreviews } from "@/features/files";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import { MessageAttachments } from "./MessageAttachments";
-import { ChatAvatar } from "./ChatAvatar";
+import { ChatAgentAvatar, ChatAvatar } from "./ChatAvatar";
 import { PinMenuItem } from "./PinMenuItem";
 import { isAgentAuthoredMessage, spansToText } from "./message_text";
 import { useChatSidePanel } from "../chat_side_panel_store";
 import { SpacePostCard } from "../../handoffs/SpacePostCard";
 import { readSpacePost } from "../../handoffs/space_posts";
-import { ChatEmojiPicker, isJumbo, useQuickEmoji } from "../emoji/ChatEmojiPicker";
+import { ChatEmojiPicker, isJumbo } from "../emoji/ChatEmojiPicker";
 import { messageTextForLinks, Span, ReplyLine, EditBox } from "./ChatMessageParts";
 
 const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -121,24 +115,8 @@ function MessageRowView({
   const [menuOpen, setMenuOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const quick = useQuickEmoji(3);
   const agent = isAgentAuthoredMessage(message);
-  const ownerName = useSpacesStore((state) =>
-    agent
-      ? state.membersBySpace[props.spaceId]?.find(
-          (member) => member.user_id === message.sender_user_id,
-        )?.name
-      : undefined,
-  );
-  const whose =
-    agent && message.sender_kind === "agent" && message.sender_user_id
-      ? message.sender_user_id === props.currentUserId
-        ? "your agent"
-        : ownerName?.trim()
-          ? `${ownerName.trim().split(/\s+/)[0]}’s agent`
-          : undefined
-      : undefined;
-  const color = props.memberColors?.get(message.sender_user_id);
+  const color = agent ? undefined : props.memberColors?.get(message.sender_user_id);
   const mentionsMe =
     message.sender_user_id !== props.currentUserId &&
     message.content.some(
@@ -243,20 +221,6 @@ function MessageRowView({
     </>
   ) : sent ? (
     <>
-      {props.canWrite
-        ? quick.map((emoji) => (
-            <IconButton
-              key={emoji}
-              label={`React with ${emoji}`}
-              aria-pressed={reactedWith(emoji)}
-              onClick={() => react(emoji)}
-            >
-              <span aria-hidden="true" className="text-control leading-none">
-                {emoji}
-              </span>
-            </IconButton>
-          ))
-        : null}
       {picker}
       {canEdit ? (
         <IconButton label="Edit" onClick={edit}>
@@ -291,11 +255,7 @@ function MessageRowView({
       grouped={grouped}
       avatar={
         agent ? (
-          <Avatar size="lg">
-            <AvatarFallback>
-              <AgentMark agentId={message.sender_agent_id} />
-            </AvatarFallback>
-          </Avatar>
+          <ChatAgentAvatar agentId={message.sender_agent_id} name={message.sender_name} size="lg" />
         ) : (
           <ChatAvatar
             id={message.sender_user_id || message.sender_name}
@@ -305,15 +265,6 @@ function MessageRowView({
             outline={avatarOutline}
           />
         )
-      }
-      badge={
-        whose ? (
-          <Text size="caption" tone="muted" className="shrink-0">
-            {whose}
-          </Text>
-        ) : agent ? (
-          <Badge variant="secondary">Agent</Badge>
-        ) : undefined
       }
       time={time.format(new Date(message.created_at))}
       timeFull={fullDateTime.format(new Date(message.created_at))}

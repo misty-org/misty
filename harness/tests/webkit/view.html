@@ -1,0 +1,13 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>View</title>
+<style>
+  #wide { display: block; } #narrow { display: none; }
+  @media (max-width: 500px) { #wide { display: none; } #narrow { display: block; } }
+  @media (prefers-color-scheme: dark) { body { background: rgb(0, 0, 0); } }
+  @media print { #screen-only { display: none; } }
+</style></head>
+<body>
+  <p id="wide">Wide layout</p>
+  <p id="narrow">Narrow layout</p>
+  <p id="screen-only">On screen</p>
+</body></html>

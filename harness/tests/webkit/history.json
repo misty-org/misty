@@ -1,0 +1,146 @@
+{
+  "page": "first.html",
+  "run": [
+    {
+      "name": "nothing to go back to yet",
+      "op": "navigate",
+      "history": "back",
+      "expect": {
+        "ok": true,
+        "moved": false,
+        "note": "~no page to go back"
+      }
+    },
+    {
+      "name": "a link to the second page",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~Go to the second page"
+      }
+    },
+    {
+      "name": "follow it",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click",
+            "ref": "e1"
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true,
+            "effect": "navigated"
+          }
+        ],
+        "snapshot": {
+          "tree": "~Second page"
+        }
+      }
+    },
+    {
+      "name": "back to the first page",
+      "op": "navigate",
+      "history": "back",
+      "expect": {
+        "ok": true,
+        "moved": true,
+        "url": "~first.html",
+        "snapshot": {
+          "title": "First page",
+          "loaded": true
+        }
+      }
+    },
+    {
+      "name": "forward again",
+      "op": "navigate",
+      "history": "forward",
+      "expect": {
+        "moved": true,
+        "url": "~second.html",
+        "snapshot": {
+          "title": "Second page"
+        }
+      }
+    },
+    {
+      "name": "a pushState change",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click",
+            "ref": "e1"
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "the address changed in place",
+      "op": "page",
+      "js": "return location.search",
+      "expect": "?tab=details"
+    },
+    {
+      "name": "back undoes the pushState",
+      "op": "navigate",
+      "history": "back",
+      "expect": {
+        "moved": true,
+        "url": "~second.html"
+      }
+    },
+    {
+      "name": "the address is back",
+      "op": "page",
+      "js": "return location.search",
+      "expect": ""
+    },
+    {
+      "name": "go to the first page by address",
+      "op": "navigate",
+      "page": "first.html",
+      "expect": {
+        "ok": true,
+        "url": "~first.html",
+        "snapshot": {
+          "title": "First page"
+        }
+      }
+    },
+    {
+      "name": "reload runs the page again",
+      "op": "navigate",
+      "history": "reload",
+      "expect": {
+        "ok": true,
+        "moved": true,
+        "snapshot": {
+          "tree": "~loads"
+        }
+      }
+    },
+    {
+      "name": "the page loaded once more",
+      "op": "page",
+      "js": "return Number(sessionStorage.getItem('firstLoads')) >= 3",
+      "expect": true
+    },
+    {
+      "name": "the runtime is sent once per new page (back and forward restore pages with it)",
+      "op": "installs",
+      "expect": 4
+    }
+  ]
+}

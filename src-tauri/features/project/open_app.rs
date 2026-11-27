@@ -90,7 +90,7 @@ pub async fn project_open_custom(
             })
         }
         CustomRequest::Add => {
-            let Some(path) = pick_program(&app).await? else {
+            let Some(path) = pick_program(&webview).await? else {
                 let programs = blocking(move || read_programs(&store)).await?.programs;
                 return Ok(CustomResult {
                     programs,

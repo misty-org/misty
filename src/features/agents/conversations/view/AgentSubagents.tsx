@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { aiSurfaceApi } from "../../runs/invocations/api";
 import type { AgentSubagent } from "../../runs/invocations/invocation_types";
-import { Button, Text, ToolBody, ToolList, ToolRow } from "@misty/ui";
+import { Button, notify, Text, ToolBody, ToolList, ToolRow } from "@misty/ui";
 
 const running = new Set(["queued", "running", "awaiting_approval", "awaiting_intervention"]);
 
@@ -21,7 +21,10 @@ export function AgentSubagents({ subagents }: { subagents: AgentSubagent[] }) {
   if (!subagents.length) return null;
   const stop = async (id: string) => {
     setStopping((current) => ({ ...current, [id]: true }));
-    await aiSurfaceApi.cancelInvocation(id).catch(() => undefined);
+    await aiSurfaceApi.cancelInvocation(id).catch(() => {
+      setStopping((current) => ({ ...current, [id]: false }));
+      notify({ message: "Couldn't stop that sub-agent. Try again.", tone: "error" });
+    });
   };
   return (
     <div className="my-3">

@@ -115,6 +115,7 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       windowLabel: hasTauriInternals() ? getCurrentWindow().label : undefined,
       mode: companion ? "companion" : "drawer",
       companionMode: companion?.interactionMode,
+      cursor: companion?.cursor || undefined,
       displayCaptures: companion?.displayCaptures,
       surfaceId: handoff?.surfaceId ?? "global",
       trigger: selection ? "selection" : companion?.continuation ? "continuation" : "message",

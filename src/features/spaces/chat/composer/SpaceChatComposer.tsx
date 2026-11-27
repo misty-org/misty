@@ -1,12 +1,15 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { lazy, Suspense, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { File, Image, Paperclip, Plus, Reply, Smile, X } from "lucide-react";
 import {
+  type ActionBarItem,
   ComposerAttachment,
+  composerDockClass,
   ComposerStatusRow,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
   IconButton,
+  TypingLine,
   MenuItem,
   MessageComposer,
   MessageComposerSend,
@@ -14,8 +17,6 @@ import {
   SuggestionItem,
   SuggestionList,
   Text,
-  TypingLine,
-  type ActionBarItem,
 } from "@misty/ui";
 import type { MistyPickerSource } from "@/features/files";
 import { AgentMark } from "@/features/agents";
@@ -23,12 +24,15 @@ import type { ChatComposerSuggestion } from "../../api/dto/space_chat";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { SpaceChatDraft } from "./use_space_chat_draft";
 import { useFileDropZone } from "@/shared/hooks/use_file_drop_zone";
-import { SpaceChatPicker } from "./SpaceChatPicker";
 import type { ChatSuggestionsState } from "../hooks/use_chat_suggestions";
 import type { useComposerInput } from "../hooks/use_composer_input";
 import type { useSpaceChatTyping } from "../hooks/use_space_chat_typing";
 import { ChatEmojiPicker } from "../emoji/ChatEmojiPicker";
 import { ChatAvatar } from "../components/ChatAvatar";
+
+const SpaceChatPicker = lazy(() =>
+  import("./SpaceChatPicker").then((module) => ({ default: module.SpaceChatPicker })),
+);
 
 const MAX_MESSAGE_LENGTH = 3000;
 
@@ -200,7 +204,7 @@ export function SpaceChatComposer(props: {
     </SuggestionList>
   ) : null;
   return (
-    <section aria-label="Message composer" className="shrink-0 px-4 pb-1">
+    <section aria-label="Message composer" className={composerDockClass}>
       <TypingLine label={props.typing.label || undefined} />
       <form
         ref={form}
@@ -211,7 +215,7 @@ export function SpaceChatComposer(props: {
       >
         <MessageComposer
           ref={dropZone.ref}
-          variant="card"
+          variant="dock"
           dragging={dropZone.dragging}
           {...dropZone.handlers}
           data-tour="space-chat-composer"
@@ -306,16 +310,18 @@ export function SpaceChatComposer(props: {
         />
       </form>
       {props.pickerOpen ? (
-        <SpaceChatPicker
-          spaceId={props.spaceId}
-          source={props.pickerSource}
-          pendingAttachmentCount={draft.pendingAttachments.length}
-          canBrowseDrive={props.canWrite}
-          canUploadAttachments={props.canWrite}
-          onClose={props.onClosePicker}
-          onChooseFiles={(paths) => void draft.uploadAttachments(paths)}
-          onChooseDriveFiles={(files) => void draft.attachDriveFiles(files)}
-        />
+        <Suspense fallback={null}>
+          <SpaceChatPicker
+            spaceId={props.spaceId}
+            source={props.pickerSource}
+            pendingAttachmentCount={draft.pendingAttachments.length}
+            canBrowseDrive={props.canWrite}
+            canUploadAttachments={props.canWrite}
+            onClose={props.onClosePicker}
+            onChooseFiles={(paths) => void draft.uploadAttachments(paths)}
+            onChooseDriveFiles={(files) => void draft.attachDriveFiles(files)}
+          />
+        </Suspense>
       ) : null}
     </section>
   );

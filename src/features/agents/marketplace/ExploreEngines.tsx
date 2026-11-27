@@ -1,11 +1,14 @@
-import { BookOpen, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
+import { BookOpen, ExternalLink, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { ENGINE_DOCS_URLS, ENGINE_IDS, type EngineId } from "@/features/engine-config/channels";
 import {
+  cliApi,
   CliUpdateDialog,
+  refreshCliStatus,
   SignInButton,
   SignInDialog,
   hasCliUpdate,
+  uninstallText,
   useCliStatuses,
   useCliUpdateFlow,
   useCliVersionStatus,
@@ -14,27 +17,31 @@ import {
 import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
+  CatalogNames,
+  ConfirmDeleteDialog,
   EmptyState,
   LogoTile,
   Mark,
   MenuItem,
-  ProductInfo,
-  ProductPage,
-  ProductSection,
   SettingsRow,
   SettingsSection,
-  Shelf,
-  ShelfItem,
-  ShelfSkeleton,
+  StoreCard,
+  StoreCards,
+  StoreInfo,
+  StoreSection,
+  StoreSheet,
+  StoreSheetSection,
+  StoreSkeleton,
 } from "@misty/ui";
 import { listEngines } from "../engines/engines_api";
+import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import {
   installRouteText,
   useRegistryEngineIds,
   useRegistryEngines,
   type CatalogEngine,
 } from "./engine_catalog";
-import { useBarAction, useExploreNav, type BarAction } from "./explore_view";
+import { useExploreNav, type BarAction } from "./explore_view";
 import { ActionButton } from "./ListingRows";
 import { sourceLabel } from "./PluginMaker";
 
@@ -42,28 +49,29 @@ const isEngineId = (id: string): id is EngineId => ENGINE_IDS.some((engine) => e
 
 export function EngineTile({
   engine,
-  size = "tile",
+  size = "item",
 }: {
   engine: CatalogEngine;
-  size?: "tile" | "hero";
+  size?: "item" | "sheet";
 }) {
   return (
     <LogoTile size={size}>
       <Mark
         of={`engine:${engine.id}`}
         label={engine.name}
-        size={size === "hero" ? 81 : 40}
+        size={size === "sheet" ? 63 : 36}
         aria-hidden
       />
     </LogoTile>
   );
 }
 
+type SignInAsk = { provider?: string; signOut?: boolean };
+
 function useEngine(engine: CatalogEngine) {
-  const nav = useExploreNav();
   const { status, signIn, loading, updating, refresh } = useCliVersionStatus(engine.id);
   const flow = useCliUpdateFlow(engine.id, { onSuccess: () => void listEngines() });
-  const [signingIn, setSigningIn] = useState<{ provider?: string } | null>(null);
+  const [signingIn, setSigningIn] = useState<SignInAsk | null>(null);
   const installed = status?.installed === true;
   const busy =
     updating || loading || flow.state.status === "planning" || flow.state.status === "running";
@@ -72,20 +80,22 @@ function useEngine(engine: CatalogEngine) {
     engine.install.route !== "none" &&
     (status === null || status.updateKind !== null);
   const canUpdate = installed && hasCliUpdate(status);
+  const signedOut = installed && signIn?.signedIn === false;
   let action: BarAction | null = null;
   if (canInstall)
     action = { label: "Get", variant: "get", disabled: busy, onClick: () => void flow.begin() };
   else if (canUpdate)
     action = { label: "Update", variant: "get", disabled: busy, onClick: () => void flow.begin() };
-  else if (installed)
-    action = {
-      label: "Manage",
-      variant: "secondary",
-      onClick: () => nav.manage({ kind: "engines", id: engine.id }),
-    };
-  let line = engine.maker ? `By ${engine.maker}` : "";
-  if (updating) line = installed ? "Updating" : "Installing";
-  else if (installed && signIn?.signedIn === false) line = "Signed out";
+  const by = engine.maker ? `, by ${engine.maker}` : "";
+  let line = installed ? `Ready${by}` : `Not installed${by}`;
+  let state: "on" | "waiting" | "off" = installed ? "on" : "off";
+  if (updating) {
+    line = installed ? "Updating" : "Installing";
+    state = "waiting";
+  } else if (signedOut) {
+    line = `Signed out${by}`;
+    state = "off";
+  } else if (installed && signIn?.signedIn) line = `Signed in${by}`;
   const dialogs = (
     <>
       <CliUpdateDialog engine={engine.id} flow={flow} />
@@ -105,8 +115,10 @@ function useEngine(engine: CatalogEngine) {
     busy,
     updating,
     canUpdate,
+    signedOut,
     action,
     line,
+    state,
     flow,
     refresh,
     setSigningIn,
@@ -114,25 +126,41 @@ function useEngine(engine: CatalogEngine) {
   };
 }
 
-function EngineItem({ engine }: { engine: CatalogEngine }) {
+type EngineState = ReturnType<typeof useEngine>;
+
+function EngineAction({
+  engine,
+  state,
+  size = "sm",
+}: {
+  engine: CatalogEngine;
+  state: EngineState;
+  size?: "sm" | "md";
+}) {
+  if (state.action) return <ActionButton action={state.action} size={size} label={engine.name} />;
+  if (!state.signedOut) return null;
+  return (
+    <SignInButton
+      engine={engine.id}
+      size={size}
+      label={`Sign in to ${engine.name}`}
+      disabled={state.updating}
+      onSignIn={state.setSigningIn}
+    />
+  );
+}
+
+export function EngineCard({ engine }: { engine: CatalogEngine }) {
   const nav = useExploreNav();
   const state = useEngine(engine);
   return (
     <>
-      <ShelfItem
+      <StoreCard
         logo={<EngineTile engine={engine} />}
         title={engine.name}
-        line={state.line || undefined}
-        action={<ActionButton action={state.action} />}
-        menu={
-          engine.source ? (
-            <MenuItem
-              icon={ExternalLink}
-              label="Open website"
-              onSelect={() => void openExternalLink(engine.source ?? "")}
-            />
-          ) : undefined
-        }
+        line={state.line}
+        state={state.state}
+        action={<EngineAction engine={engine} state={state} />}
         onOpen={() => nav.open({ kind: "engines", id: engine.id })}
       />
       {state.dialogs}
@@ -148,8 +176,8 @@ export function EnginesPage() {
   if (!settled && engines.every((engine) => statuses[engine.id] === null))
     return (
       <>
-        <ShelfSkeleton label="Engines" />
-        <ShelfSkeleton label="Engines" />
+        <StoreSkeleton label="Engines" look="cards" items={4} />
+        <StoreSkeleton label="Engines" look="cards" items={2} />
       </>
     );
   const here = engines.filter((engine) => statuses[engine.id]?.installed);
@@ -157,49 +185,59 @@ export function EnginesPage() {
   return (
     <>
       {here.length ? (
-        <Shelf title="On this computer">
-          {here.map((engine) => (
-            <EngineItem key={engine.id} engine={engine} />
-          ))}
-        </Shelf>
+        <StoreSection
+          title="On this computer"
+          detail={here.length === 1 ? "1 engine" : `${here.length} engines`}
+        >
+          <StoreCards label="On this computer">
+            {here.map((engine) => (
+              <EngineCard key={engine.id} engine={engine} />
+            ))}
+          </StoreCards>
+        </StoreSection>
       ) : null}
       {rest.length ? (
-        <Shelf title="More engines">
-          {rest.map((engine) => (
-            <EngineItem key={engine.id} engine={engine} />
-          ))}
-        </Shelf>
+        <StoreSection title="More engines">
+          <StoreCards label="More engines">
+            {rest.map((engine) => (
+              <EngineCard key={engine.id} engine={engine} />
+            ))}
+          </StoreCards>
+        </StoreSection>
       ) : null}
     </>
   );
 }
 
-export function EngineProduct({ id }: { id: string }) {
+export function EngineSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const engine = useRegistryEngines().find((one) => one.id === id);
-  if (!engine)
-    return (
-      <EmptyState
-        inline
-        title="This engine isn't listed any more"
-        line="Misty's registry no longer has it."
-      />
-    );
-  return <EngineProductPage engine={engine} />;
+  return engine ? <EngineSheetBody engine={engine} onClose={onClose} /> : null;
 }
 
-function EngineProductPage({ engine }: { engine: CatalogEngine }) {
-  const nav = useExploreNav();
+function EngineSheetBody({ engine, onClose }: { engine: CatalogEngine; onClose: () => void }) {
   const state = useEngine(engine);
-  useBarAction(state.action, engine.name);
+  const agents = usePersonalAgentsStore((store) => store.agents).filter(
+    (agent) => agent.engine === engine.id,
+  );
+  const [removing, setRemoving] = useState(false);
   const docs = isEngineId(engine.id) ? ENGINE_DOCS_URLS[engine.id] : undefined;
   const version = state.status?.localVersion ? versionText(state.status.localVersion) : null;
+  const removeKind = state.updating ? null : (state.status?.removeKind ?? null);
+  const status = !state.installed
+    ? "Not installed"
+    : state.signIn?.signedIn === false
+      ? "Signed out"
+      : state.signIn?.signedIn
+        ? "Signed in"
+        : "Ready";
   return (
-    <ProductPage
-      logo={<EngineTile engine={engine} size="hero" />}
+    <StoreSheet
+      open
+      onOpenChange={(open) => !open && onClose()}
+      logo={<EngineTile engine={engine} size="sheet" />}
       title={engine.name}
-      line={engine.maker ? `An engine by ${engine.maker}` : undefined}
       maker={engine.maker}
-      action={<ActionButton action={state.action} size="md" />}
+      action={<EngineAction engine={engine} state={state} size="md" />}
       menu={
         <>
           {engine.source ? (
@@ -212,13 +250,6 @@ function EngineProductPage({ engine }: { engine: CatalogEngine }) {
           {docs ? (
             <MenuItem icon={BookOpen} label="Docs" onSelect={() => void openExternalLink(docs)} />
           ) : null}
-          {state.installed ? (
-            <MenuItem
-              icon={Settings2}
-              label="Manage"
-              onSelect={() => nav.manage({ kind: "engines", id: engine.id })}
-            />
-          ) : null}
           <MenuItem
             icon={RefreshCw}
             label="Check again"
@@ -227,81 +258,93 @@ function EngineProductPage({ engine }: { engine: CatalogEngine }) {
           />
         </>
       }
-      onHeroOut={nav.setPinned}
       facts={[
-        ...(engine.maker ? [{ label: "Made by", value: engine.maker }] : []),
-        {
-          label: "Status",
-          value: !state.installed
-            ? "Not here"
-            : state.signIn?.signedIn === false
-              ? "Sign in"
-              : "Ready",
-        },
+        { label: "Status", value: status },
         ...(version ? [{ label: "Version", value: version }] : []),
+        ...(state.signIn?.detail ? [{ label: "Plan", value: state.signIn.detail }] : []),
         { label: "Installs", value: installRouteText(engine.install.route) },
       ]}
     >
-      <ProductSection title="Information">
-        <ProductInfo
+      {state.installed ? (
+        <SettingsSection title="Account">
+          {state.signIn ? (
+            <SettingsRow
+              label={
+                state.signIn.signedIn ? "Signed in with your own account" : "Not signed in yet"
+              }
+            >
+              {state.signIn.signedIn ? (
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  disabled={state.updating}
+                  onClick={() => state.setSigningIn({ signOut: true })}
+                >
+                  Sign out
+                </Button>
+              ) : (
+                <SignInButton
+                  engine={engine.id}
+                  size="sm"
+                  label={`Sign in to ${engine.name}`}
+                  disabled={state.updating}
+                  onSignIn={state.setSigningIn}
+                />
+              )}
+            </SettingsRow>
+          ) : null}
+          <SettingsRow
+            label={version ? `Version ${version}` : "Version"}
+            description={
+              state.canUpdate && state.status?.latestVersion
+                ? `${versionText(state.status.latestVersion)} is out`
+                : "Up to date"
+            }
+          >
+            <Button
+              size="sm"
+              disabled={state.busy}
+              onClick={() => (state.canUpdate ? void state.flow.begin() : state.refresh())}
+            >
+              {state.canUpdate ? "Update" : "Check for updates"}
+            </Button>
+          </SettingsRow>
+        </SettingsSection>
+      ) : null}
+      {agents.length ? (
+        <StoreSheetSection title="Agents on this engine">
+          <CatalogNames names={agents.map((agent) => agent.name)} />
+        </StoreSheetSection>
+      ) : null}
+      <StoreSheetSection title="Information">
+        <StoreInfo
           items={[
             ...(engine.maker ? [{ label: "Made by", value: engine.maker }] : []),
             ...(engine.source ? [{ label: "Source", value: sourceLabel(engine.source) }] : []),
             { label: "Installs", value: installRouteText(engine.install.route) },
           ]}
         />
-      </ProductSection>
-      {state.dialogs}
-    </ProductPage>
-  );
-}
-
-export function EngineManage({ id }: { id: string }) {
-  const engine = useRegistryEngines().find((one) => one.id === id);
-  return engine ? <EngineManageRows engine={engine} /> : null;
-}
-
-function EngineManageRows({ engine }: { engine: CatalogEngine }) {
-  const state = useEngine(engine);
-  const version = state.status?.localVersion ? versionText(state.status.localVersion) : null;
-  if (!state.installed) return null;
-  return (
-    <>
-      <SettingsSection title={engine.name}>
-        {state.signIn ? (
-          <SettingsRow
-            label="Signed in"
-            description={state.signIn.signedIn ? "With your own account" : "Not yet"}
-          >
-            {state.signIn.signedIn ? null : (
-              <SignInButton
-                engine={engine.id}
-                size="sm"
-                label={`Sign in to ${engine.name}`}
-                disabled={state.updating}
-                onSignIn={state.setSigningIn}
-              />
-            )}
-          </SettingsRow>
-        ) : null}
-        <SettingsRow
-          label={version ? `Version ${version}` : "Version"}
-          description={
-            state.canUpdate && state.status?.latestVersion
-              ? `${versionText(state.status.latestVersion)} is out`
-              : "Up to date"
-          }
-        >
-          <Button
-            size="sm"
-            disabled={state.busy}
-            onClick={() => (state.canUpdate ? void state.flow.begin() : state.refresh())}
-          >
-            {state.canUpdate ? "Update" : "Check for updates"}
+      </StoreSheetSection>
+      {removeKind ? (
+        <div>
+          <Button variant="danger" onClick={() => setRemoving(true)}>
+            Uninstall
           </Button>
-        </SettingsRow>
-      </SettingsSection>
+        </div>
+      ) : null}
+      <ConfirmDeleteDialog
+        open={removing}
+        onOpenChange={setRemoving}
+        title={`Uninstall ${engine.name}?`}
+        what={uninstallText(removeKind ?? "misty", engine.name)}
+        confirmLabel="Uninstall"
+        onConfirm={async () => {
+          await cliApi.remove(engine.id);
+          await refreshCliStatus(engine.id);
+          void listEngines();
+        }}
+      />
       {state.dialogs}
-    </>
+    </StoreSheet>
   );
 }

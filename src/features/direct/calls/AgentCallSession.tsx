@@ -4,7 +4,7 @@ import { IconButton } from "@misty/ui";
 import { useUserStore } from "@/features/account";
 import { openAgentThread } from "@/features/agents";
 import { useCallAudio } from "./CallAudioControls";
-import { savedCallDevice } from "./call_devices";
+import { savedCallDevice, useSavedCamera } from "./call_devices";
 import { useCallSession } from "./call_session_store";
 import { useCallShortcuts } from "./use_call_shortcuts";
 import type { CallControls, CallPerson, CallVideo } from "./use_live_kit_call";
@@ -32,7 +32,7 @@ export function AgentCallSession({ call }: { call: LocalAgentCall }) {
   const view = useSyncExternalStore(call.subscribe, call.current, call.current);
   const me = useUserStore((state) => state.me);
   const audio = useCallAudio();
-  const camera = savedCallDevice.videoinput((state) => state.value);
+  const camera = useSavedCamera((state) => state.value);
   const cameraVideo = useMemo(
     () => (view.camera ? streamVideo(view.camera) : undefined),
     [view.camera],

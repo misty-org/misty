@@ -29,7 +29,7 @@ export function useChatBar(props: {
   const pinnedOpen = useChatSidePanel((panel) => panel.pinnedOpen);
   const membersShown = !useChatSidebarPreferences((state) => state.value.hideMembers);
   const saveMembers = useChatSidebarPreferences((state) => state.set);
-  const mute = useMuted(spaceId, muteId, "Notifications off for this chat");
+  const mute = useMuted(spaceId, muteId, "this chat");
 
   const threadsOpen = threadsListOpen || threadOpen;
   const threadsLabel = threadsUnread > 0 ? `Threads, ${threadsUnread} unread` : "Threads";

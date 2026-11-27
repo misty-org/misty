@@ -2,6 +2,7 @@ import { engineModels, mistyEngine, modelNamed, usablePick } from "../../engines
 import { effectiveEffort } from "../../conversations/composer/controls/engine_options";
 import { defaultEngineId } from "../../engines/engine_run";
 import { engineModesFor, resolveEngineMode } from "../../engines/engine_modes";
+import { DEFAULT_PERMISSION_MODE } from "../../plans/permission_mode";
 import { personaInstructions } from "../../personas/catalog_api";
 import { assembleAgentPrompt } from "../../bots/bot_prompt";
 import { takeComputerUseAttachment } from "@/features/computer-use/computer_use_attachment";
@@ -37,13 +38,6 @@ interface ChatFacts {
   title: string | null;
   priorRuns: string[];
 }
-
-const SCRATCH_CHAT_NOTE =
-  "# Where you work\nThis is a chat. You work in its own scratch folder, which is deleted with the " +
-  "chat. When the work becomes a project the person will keep (a repository, an app or tool they " +
-  "will run again, files that belong together), call the open_in_code tool to offer moving this " +
-  "chat into Code, where it gets a project folder of its own, rather than building the project " +
-  "here. Never move or copy the files yourself: the person decides.";
 
 async function chatFacts(conversationId: string, runId: string): Promise<ChatFacts> {
   const chat = useMistyStore.getState().conversations.find((item) => item.id === conversationId);
@@ -109,7 +103,7 @@ export async function buildRunBody(
   const continued = conversationId ? await continuationNote(conversationId).catch(() => "") : "";
   const inProject =
     Boolean(conversationId) && (multirunFolder !== undefined || isProjectChat(conversationId));
-  const saved = input.permissionMode ?? (state.permissionMode || agent?.default_run_mode || "ask");
+  const saved = input.permissionMode ?? (state.permissionMode || DEFAULT_PERMISSION_MODE);
   const chosenCollaboration = input.collaborationMode ?? (conversationId ? state.mode : undefined);
   const engineId =
     agent?.engine && agent.engine !== mistyEngine
@@ -139,6 +133,7 @@ export async function buildRunBody(
     collaboration_mode: collaborationMode,
     requested_artifact_kind: requestedKind || undefined,
     conversation_id: conversationId,
+    cursor: input.cursor || undefined,
     now: goNow(server.timezone, new Date(now)),
     signed_in: signedIn,
     apps_connected: await appsConnected(),
@@ -150,12 +145,7 @@ export async function buildRunBody(
         ? {
             name: agent?.name ?? "",
             role: agent?.role ?? "",
-            instructions: [
-              agent ? assembleAgentPrompt({ agent }).text : "",
-              personas,
-              continued,
-              conversationId && !inProject && engineId && !inThread ? SCRATCH_CHAT_NOTE : "",
-            ]
+            instructions: [agent ? assembleAgentPrompt({ agent }).text : "", personas, continued]
               .filter(Boolean)
               .join("\n\n"),
           }

@@ -13,7 +13,7 @@ pub mod live;
 pub(crate) mod local_prompt;
 pub mod local_run;
 pub mod voice;
-pub use local_prompt::{companion_engine_note, engine_teach_note, without_cursor_tags};
+pub use local_prompt::{companion_engine_note, engine_teach_note, screens_note, without_cursor_tags};
 pub(crate) mod browser_reinspection;
 pub(crate) mod citation_check;
 pub(crate) mod closing_answer;

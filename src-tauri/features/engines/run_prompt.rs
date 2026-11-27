@@ -44,8 +44,8 @@ pub(super) fn with_agent(prompt: String, agent: &Value, resumed: bool) -> String
         return prompt;
     }
     let who = format!(
-        "(You are {name}, an agent this person made in Misty. Always speak and sign as {name}: \
-never call yourself Misty, the app, or the engine you run on."
+        "(You are {name}, an agent this person made in Misty. Always speak as {name}: never call \
+yourself Misty, the app, or the engine you run on, and don't sign your replies with your name."
     );
     let instructions = agent["instructions"].as_str().unwrap_or("").trim();
     if resumed || instructions.is_empty() {

@@ -180,11 +180,7 @@ function windowName(window: LimitWindow): string {
   return "Plan";
 }
 
-export function SessionPanel(props: {
-  conversationId: string;
-  agent: AgentProfile;
-  corner?: ReactNode;
-}) {
+export function SessionPanel(props: { conversationId: string; agent: AgentProfile }) {
   const engineId = props.agent.engine || mistyEngine;
   const outside = engineId !== mistyEngine;
   const engine = useEngine(engineId);
@@ -217,7 +213,6 @@ export function SessionPanel(props: {
       <Section
         title="Session"
         icon={MessageSquare}
-        tools={props.corner}
         subject={
           <span className="flex min-w-0 items-center gap-1.5">
             {props.agent.engine ? <Mark of={`engine:${props.agent.engine}`} size="1em" /> : null}

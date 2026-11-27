@@ -1,6 +1,4 @@
-import { SpaceWorkspaceSurface } from "@/features/spaces";
-import { AgentsPage } from "@/features/agents";
-import { DirectSurface } from "@/features/direct";
+import { lazy, Suspense } from "react";
 import {
   WorkspaceViewRouteScope,
   useWorkspaceStore,
@@ -8,7 +6,19 @@ import {
 } from "@/features/app-windows";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { QuietPane } from "@misty/ui";
-import { WebTabSurface } from "./WebTabSurface";
+
+const SpaceWorkspaceSurface = lazy(() =>
+  import("@/features/spaces/overview/SpaceWorkspaceSurface").then((module) => ({
+    default: module.SpaceWorkspaceSurface,
+  })),
+);
+const AgentsPage = lazy(() => import("@/features/agents/page/AgentsPage"));
+const DirectSurface = lazy(() =>
+  import("@/features/direct/DirectSurface").then((module) => ({ default: module.DirectSurface })),
+);
+const WebTabSurface = lazy(() =>
+  import("./WebTabSurface").then((module) => ({ default: module.WebTabSurface })),
+);
 
 export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   if (tab.placeholder) return <EmptyWorkspacePane />;
@@ -20,17 +30,19 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         onClickCapture={() => useWorkspaceStore.getState().commitPlaceholder(tab.id)}
       >
         <WorkspaceViewRouteScope tab={tab}>
-          {tab.surfaceId === "space" ? (
-            <SpaceWorkspaceSurface tab={tab} />
-          ) : tab.surfaceId === "agents" ? (
-            <AgentsPage />
-          ) : tab.surfaceId === "direct" ? (
-            <DirectSurface tab={tab} />
-          ) : tab.surfaceId === "browser" ? (
-            <WebTabSurface tab={tab} />
-          ) : (
-            <EmptyWorkspacePane />
-          )}
+          <Suspense fallback={null}>
+            {tab.surfaceId === "space" ? (
+              <SpaceWorkspaceSurface tab={tab} />
+            ) : tab.surfaceId === "agents" ? (
+              <AgentsPage />
+            ) : tab.surfaceId === "direct" ? (
+              <DirectSurface tab={tab} />
+            ) : tab.surfaceId === "browser" ? (
+              <WebTabSurface tab={tab} />
+            ) : (
+              <EmptyWorkspacePane />
+            )}
+          </Suspense>
         </WorkspaceViewRouteScope>
       </div>
     </RenderErrorBoundary>

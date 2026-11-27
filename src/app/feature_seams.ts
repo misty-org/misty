@@ -27,17 +27,14 @@ import {
 } from "@/features/agents";
 import { browserLibrary } from "@/features/browser";
 import {
-  AgentCallSplit,
   callsForApps,
   endCallsForAccountReset,
   useAgentCall,
   useAgentCallTranscript,
   useAnyCall,
-  VoiceChannelPage,
 } from "@/features/direct";
 import { noteAsk, vocativeRouting, voiceCleanup, voiceDevice, voiceEngine } from "@/features/voice";
 import {
-  SetupStepBody,
   setupStepCopy,
   TourInfoButton,
   useSetupStepDone,
@@ -45,7 +42,6 @@ import {
 } from "@/features/onboarding";
 import {
   catalogLogoUrl,
-  DrivePickerPanel,
   driveGateway,
   FilesPage,
   handoffGateway,
@@ -60,6 +56,20 @@ import {
   useExploreInstalledApps,
   useSpacesStore,
 } from "@/features/spaces";
+import { lazyPart } from "./LazyPart";
+
+const AgentCallSplit = lazyPart(() =>
+  import("@/features/direct/calls/AgentCallSplit").then((module) => module.AgentCallSplit),
+);
+const VoiceChannelPage = lazyPart(() =>
+  import("@/features/direct/calls/VoiceChannelPage").then((module) => module.VoiceChannelPage),
+);
+const SetupStepBody = lazyPart(() =>
+  import("@/features/onboarding/setup/SetupSteps").then((module) => module.SetupStepBody),
+);
+const DrivePickerPanel = lazyPart(() =>
+  import("@/features/spaces/drive/DrivePickerPanel").then((module) => module.DrivePickerPanel),
+);
 
 accountResets.listen((previousAccountId) => {
   endCallsForAccountReset();

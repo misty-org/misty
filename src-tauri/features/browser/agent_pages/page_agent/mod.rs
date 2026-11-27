@@ -4,7 +4,7 @@ use crate::browser::{
     BrowserSessionState,
 };
 use serde_json::{json, Value};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tauri::{AppHandle, Manager, Webview};
 
 mod batch;
@@ -17,26 +17,22 @@ pub(crate) use judge::{judge_point, page_controls, scope_site};
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod frames;
 pub(in crate::browser) use execute::execute;
-use execute::poll;
 mod navigation;
-pub(in crate::browser) use navigation::{first_load, landed, mark_document};
+pub(in crate::browser) use navigation::{first_load, navigate, picture};
+mod host;
 mod site_blocks;
-mod step;
-pub(crate) use step::CURSOR_GLIDE_MS;
-mod steps;
+use host::TabHost;
+pub(crate) use host::CURSOR_GLIDE_MS;
 #[cfg(windows)]
 pub mod windows;
 pub(in crate::browser) use batch::upload;
-use batch::{run_skill, run_steps};
 pub(in crate::browser) use site_blocks::blocked as site_blocked;
 pub(crate) use site_blocks::SiteBlocks;
-use steps::Step;
 
 const RUNTIME: &str = misty_page_runtime::RUNTIME;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 const WORLD: &str = "misty-agent-page";
 const SNAPSHOT_CHARS: u64 = 24_000;
-const AFTER_STEPS_SNAPSHOT_CHARS: u64 = 12_000;
 
 pub(in crate::browser) fn handles(operation: &str) -> bool {
     matches!(
@@ -45,6 +41,14 @@ pub(in crate::browser) fn handles(operation: &str) -> bool {
             | "browser.find"
             | "browser.extract"
             | "browser.wait_for"
+            | "browser.console"
+            | "browser.network"
+            | "browser.storage"
+            | "browser.verify"
+            | "browser.highlight"
+            | "browser.emulate"
+            | "browser.pdf"
+            | "browser.page_tools"
             | "browser.steps"
             | "browser.fill_form"
             | "browser.skill"
@@ -95,48 +99,51 @@ async fn call_at(
         String::new()
     };
     let invocation = format!(
-        "const args = {}; {semantic} const page = globalThis.__mistyAgentPageV1;",
+        "const args = {}; {semantic}",
         serde_json::to_string(&args).map_err(|error| error.to_string())?
     );
-    let operation = serde_json::to_string(operation).map_err(|error| error.to_string())?;
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     {
-        let body = format!(
-            "{RUNTIME}\n{invocation}\nreturn JSON.stringify(await page.call({operation}, args));"
-        );
-        let raw = match frame {
-            Some(frame) => {
-                crate::browser::pages::content_world::evaluate_in_frame(
-                    webview.clone(),
-                    WORLD,
-                    body,
-                    frame,
-                )
-                .await?
-            }
-            None => {
-                crate::browser::pages::content_world::evaluate_in_content_world(
-                    webview.clone(),
-                    WORLD,
-                    body,
-                )
-                .await?
+        let evaluate = |body: String| async move {
+            match frame {
+                Some(frame) => {
+                    crate::browser::pages::content_world::evaluate_in_frame(
+                        webview.clone(),
+                        WORLD,
+                        body,
+                        frame,
+                    )
+                    .await
+                }
+                None => {
+                    crate::browser::pages::content_world::evaluate_in_content_world(
+                        webview.clone(),
+                        WORLD,
+                        body,
+                    )
+                    .await
+                }
             }
         };
+        let mut raw = evaluate(misty_page_runtime::light_body(operation, &invocation)).await?;
+        if misty_page_runtime::missing(&raw) {
+            raw = evaluate(misty_page_runtime::full_body(operation, &invocation)).await?;
+        }
         serde_json::from_str(&raw)
             .map_err(|error| format!("The page returned invalid data: {error}"))
     }
     #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = frame;
-        if operation == "\"settle\"" {
+        if operation == "settle" {
             tokio::time::sleep(Duration::from_millis(300)).await;
             return Ok(json!({"ok": true}));
         }
+        let operation = serde_json::to_string(operation).map_err(|error| error.to_string())?;
         crate::browser::eval_json(
             webview.clone(),
             format!(
-                "(() => {{ {RUNTIME}\n{invocation}\nreturn page.call({operation}, args); }})()"
+                "(() => {{ {RUNTIME}\n{invocation}\nconst page = globalThis.__mistyAgentPageV1;\nreturn page.call({operation}, args); }})()"
             ),
         )
         .await

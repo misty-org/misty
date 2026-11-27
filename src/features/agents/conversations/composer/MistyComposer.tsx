@@ -2,7 +2,6 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  FileInput,
   IconButton,
   MenuItem,
   MenuTrigger,
@@ -18,8 +17,11 @@ import { ImagePlus, Plus, ScanLine, X } from "lucide-react";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef } from "react";
 import { useFileDropZone } from "@/shared/hooks/use_file_drop_zone";
+import { pickFiles } from "@/shared/lib/file_pick";
 import { validateMistyImage } from "./misty_image_values";
 import type { MistyImageAttachment } from "../state/conversation_types";
+
+const ATTACHABLE = "image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json";
 
 export function MistyComposer(props: {
   value: string;
@@ -46,7 +48,6 @@ export function MistyComposer(props: {
   className?: string;
   onError?: (message: string) => void;
 }) {
-  const fileRef = useRef<HTMLInputElement | null>(null);
   const localTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const textareaRef = props.textareaRef ?? localTextareaRef;
   const accept = (files: File[]) => {
@@ -79,7 +80,17 @@ export function MistyComposer(props: {
   );
   const addRows = (
     <>
-      <MenuItem icon={ImagePlus} label="Attach files" onSelect={() => fileRef.current?.click()} />
+      <MenuItem
+        icon={ImagePlus}
+        label="Attach files"
+        onSelect={() =>
+          void pickFiles({
+            title: "Attach files",
+            accept: ATTACHABLE,
+            multiple: props.maxAttachments > 1,
+          }).then((files) => files.length && accept(files))
+        }
+      />
       {props.onCapture ? (
         <MenuItem icon={ScanLine} label="Capture part of the screen" onSelect={props.onCapture} />
       ) : null}
@@ -110,18 +121,9 @@ export function MistyComposer(props: {
   };
   return (
     <>
-      <FileInput
-        ref={fileRef}
-        accept="image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"
-        multiple={props.maxAttachments > 1}
-        onChange={(event) => {
-          accept(Array.from(event.target.files ?? []));
-          event.target.value = "";
-        }}
-      />
       <MessageComposer
         ref={dropZone.ref}
-        variant="card"
+        variant="dock"
         roomy={props.roomy}
         status={props.status}
         dragging={dropZone.dragging}

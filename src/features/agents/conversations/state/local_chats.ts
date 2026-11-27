@@ -66,10 +66,19 @@ function storableMessage(message: GlobalAiMessage): GlobalAiMessage {
   return storedMessage;
 }
 
+const documentsByMessage = new WeakMap<GlobalAiMessage, string>();
+
+function messageDocument(message: GlobalAiMessage): string {
+  let document = documentsByMessage.get(message);
+  if (document === undefined) {
+    document = JSON.stringify(storableMessage(message));
+    documentsByMessage.set(message, document);
+  }
+  return document;
+}
+
 function messageDocuments(conversation: GlobalAiConversation): Map<string, string> {
-  return new Map(
-    conversation.messages.map((message) => [message.id, JSON.stringify(storableMessage(message))]),
-  );
+  return new Map(conversation.messages.map((message) => [message.id, messageDocument(message)]));
 }
 
 export function markStoredChats(conversations: GlobalAiConversation[], account?: string): void {
@@ -78,6 +87,51 @@ export function markStoredChats(conversations: GlobalAiConversation[], account?:
     if (account)
       storedMessageDocuments.set(chatKey(account, conversation.id), messageDocuments(conversation));
   }
+}
+
+function sameMessage(a: GlobalAiMessage, b: GlobalAiMessage): boolean {
+  return a === b || (a.activity === b.activity && messageDocument(a) === messageDocument(b));
+}
+
+export function keepUnchangedChats(
+  previous: GlobalAiConversation[],
+  next: GlobalAiConversation[],
+): GlobalAiConversation[] {
+  if (!previous.length) return next;
+  const before = new Map(previous.map((conversation) => [conversation.id, conversation]));
+  let changed = previous.length !== next.length;
+  const kept = next.map((conversation, index) => {
+    const old = before.get(conversation.id);
+    if (!old) {
+      changed = true;
+      return conversation;
+    }
+    const oldMessages = new Map(old.messages.map((message) => [message.id, message]));
+    let messagesChanged = old.messages.length !== conversation.messages.length;
+    const messages = conversation.messages.map((message, at) => {
+      const match = oldMessages.get(message.id);
+      if (match && sameMessage(match, message)) {
+        if (old.messages[at] !== match) messagesChanged = true;
+        return match;
+      }
+      messagesChanged = true;
+      return message;
+    });
+    const same =
+      !messagesChanged &&
+      old.messageBeforeSeq === conversation.messageBeforeSeq &&
+      Boolean(old.hasOlderMessages) === Boolean(conversation.hasOlderMessages) &&
+      JSON.stringify(storable(old)) === JSON.stringify(storable(conversation));
+    if (same) {
+      if (previous[index] !== old) changed = true;
+      return old;
+    }
+    changed = true;
+    return messagesChanged
+      ? { ...conversation, messages }
+      : { ...conversation, messages: old.messages };
+  });
+  return changed ? kept : previous;
 }
 
 export function isStoredChat(conversation: GlobalAiConversation): boolean {
@@ -114,7 +168,7 @@ async function saveConversation(
     await invoke("agent_chats_messages_upsert", {
       account,
       conversation: conversation.id,
-      messages: changedMessages.map((message) => JSON.stringify(storableMessage(message))),
+      messages: changedMessages.map(messageDocument),
       deleted: deletedMessages,
     });
   }
@@ -168,6 +222,13 @@ export const localChats = {
     const conversations = await list<GlobalAiConversation>(account, "conversation");
     return Promise.all(
       conversations.map(async (conversation) => {
+        if (Array.isArray(conversation.messages)) {
+          return {
+            ...conversation,
+            messageBeforeSeq: conversation.messageBeforeSeq ?? undefined,
+            hasOlderMessages: Boolean(conversation.hasOlderMessages),
+          };
+        }
         const page = await messagesPage(account, conversation.id);
         return {
           ...conversation,

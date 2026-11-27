@@ -45,9 +45,10 @@ export function followReply(conversationId: string, messageId: string, runId: st
       if (ended) return;
       if (event.type === "invocation.completed") end({ state: "completed" });
       else if (event.type === "invocation.failed") end({ state: "failed", content: event.error });
-      else if (event.type === "invocation.canceled")
-        end({ state: "canceled", content: said() || "This run was stopped." });
-      else applyGlobalInvocationEvent(set, get, conversationId, messageId, event);
+      else if (event.type === "invocation.canceled") {
+        flushStreamedText();
+        end({ state: "canceled", content: said() });
+      } else applyGlobalInvocationEvent(set, get, conversationId, messageId, event);
     },
     onError: (error) => end({ state: "failed", content: said() || error.message }),
   });

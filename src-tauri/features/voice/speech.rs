@@ -115,25 +115,29 @@ pub struct SpeechSupport {
 }
 
 #[tauri::command]
-pub fn speech_support(
+pub async fn speech_support(
     webview: Webview,
     state: State<'_, SpeechState>,
 ) -> Result<SpeechSupport, String> {
     require_person(&webview)?;
-    let chosen = state
+    let hearing = state
         .chosen
         .lock()
-        .map_err(|_| voice_speech::reason("failed"))?;
-    let recognition = speech_models::vad_spec().is_some()
-        && chosen
-            .hearing
-            .as_deref()
-            .is_some_and(|id| speech_models::hearing_spec(id).is_some());
-    let speaking = super::voicebox::usable();
-    Ok(SpeechSupport {
-        recognition,
-        speaking,
+        .map_err(|_| voice_speech::reason("failed"))?
+        .hearing
+        .clone();
+    tokio::task::spawn_blocking(move || {
+        let recognition = speech_models::vad_spec().is_some()
+            && hearing
+                .as_deref()
+                .is_some_and(|id| speech_models::hearing_spec(id).is_some());
+        SpeechSupport {
+            recognition,
+            speaking: super::voicebox::usable(),
+        }
     })
+    .await
+    .map_err(|_| voice_speech::reason("failed"))
 }
 
 pub(super) fn forget_model(state: &SpeechState, id: &str) {

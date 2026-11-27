@@ -131,17 +131,24 @@ export function useMergedTitlebar(
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
+    const chromeParts = "[data-window-toolbar], [data-workspace-pane], .misty-workspace-tabs";
     const resize = new ResizeObserver(schedule);
     const observe = () => {
       resize.disconnect();
       resize.observe(shell);
-      shell
-        .querySelectorAll("[data-window-toolbar], [data-workspace-pane], .misty-workspace-tabs")
-        .forEach((element) => resize.observe(element));
+      shell.querySelectorAll(chromeParts).forEach((element) => resize.observe(element));
     };
+    const holdsChrome = (node: Node) =>
+      node instanceof Element &&
+      (node.matches(chromeParts) || node.querySelector(chromeParts) !== null);
+    const changesChrome = (record: MutationRecord) =>
+      record.type === "childList" &&
+      ([...record.addedNodes].some(holdsChrome) || [...record.removedNodes].some(holdsChrome));
+    const movesChrome = (record: MutationRecord) =>
+      changesChrome(record) || holdsChrome(record.target);
     const mutations = new MutationObserver((records) => {
-      if (records.some((record) => record.type === "childList")) observe();
-      schedule();
+      if (records.some(changesChrome)) observe();
+      if (records.some(movesChrome)) schedule();
     });
     mutations.observe(shell, {
       subtree: true,

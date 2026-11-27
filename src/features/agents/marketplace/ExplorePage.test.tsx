@@ -192,7 +192,7 @@ describe("Explore, from the registry's index", () => {
     expect(template).toBeTruthy();
     show("templates");
     const row = (await screen.findAllByText(template!.name))[0].closest("li") as HTMLElement;
-    fireEvent.click(within(row).getByRole("button", { name: "Get" }));
+    fireEvent.click(within(row).getByRole("button", { name: "Use" }));
     await waitFor(() => expect(calls.some((call) => call.command === "agent_save")).toBe(true));
     const saved = calls.find((call) => call.command === "agent_save")?.args as {
       soul: string;
@@ -223,7 +223,7 @@ describe("Explore, from the registry's index", () => {
     expect(request.skillTargets).toEqual(["gemini"]);
   });
 
-  it("asks an MCP server's keys in the Manage panel and runs it with them", async () => {
+  it("asks an MCP server's keys in its details sheet and runs it with them", async () => {
     const server = top("mcps").items.find(
       (item: { package?: { type: string }; env?: unknown[]; remote?: unknown }) =>
         !item.remote && item.package?.type === "npm" && item.env?.length,
@@ -232,7 +232,7 @@ describe("Explore, from the registry's index", () => {
     show("mcps");
     const row = (await screen.findAllByText(server!.name))[0].closest("li") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Get" }));
-    const panel = await screen.findByRole("complementary", { name: "Manage" });
+    const panel = await screen.findByRole("dialog", { name: server!.name });
     for (const one of server!.env)
       fireEvent.change(within(panel).getByLabelText(new RegExp(one.name)), {
         target: { value: "value-for-test" },
@@ -254,13 +254,22 @@ describe("Explore, from the registry's index", () => {
     expect(added.env).toEqual([]);
   });
 
-  it("opens a product page with its facts and puts Manage in a side panel", async () => {
+  it("opens one details sheet with its facts from a row, and offers no Manage", async () => {
     const skill = top("skills").items[0] as { name: string };
     show("skills");
-    fireEvent.click((await screen.findAllByText(skill.name))[0].closest("button") as HTMLElement);
-    expect(await screen.findByRole("heading", { level: 1, name: skill.name })).toBeTruthy();
-    expect(screen.getByRole("group", { name: "Facts" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Information" })).toBeTruthy();
+    const row = (await screen.findAllByText(skill.name))[0].closest("li") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: skill.name }));
+    const sheet = await screen.findByRole("dialog", { name: skill.name });
+    expect(within(sheet).getByRole("group", { name: "Facts" })).toBeTruthy();
+    expect(within(sheet).getByRole("region", { name: "Information" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Manage" })).toBeNull();
+    expect(screen.queryByRole("complementary", { name: "Manage" })).toBeNull();
+  });
+
+  it("names the rail's last row Installed", async () => {
+    show("all");
+    expect(await screen.findByText("Installed")).toBeTruthy();
+    expect(screen.queryByText("My apps")).toBeNull();
   });
 
   it("searches every kind at once", async () => {

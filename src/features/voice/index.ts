@@ -11,7 +11,7 @@ export {
 } from "./settings/VoiceSection";
 export { speechLanguages, voiceLabel, voiceSample } from "./settings/speech_choices";
 export { voiceSettings } from "./voice_settings";
-export { savedInputDevice } from "./input_device";
+export { useSavedInputDevice } from "./input_device";
 export { voiceCleanup, voiceDevice } from "./api";
 export {
   chosenVoice,

@@ -55,7 +55,24 @@ pub fn companion_engine_note(captures: &[(String, u32, u32)]) -> String {
         note.push_str("No screenshots came with this turn. For a question about the user's screen, say you can't see it right now and use [POINT:none].\n");
         return note;
     }
-    note.push_str("The images attached to this message are this turn's screenshots of the user's screens, in this order:\n");
+    note.push_str(&screens_listed(captures));
+    note.push_str("Point in those pixels with the screenshot's name. Answer from the screenshots; don't edit files or run commands to answer a question about the screen.\n");
+    note
+}
+
+pub fn screens_note(captures: &[(String, u32, u32)]) -> Option<String> {
+    if captures.is_empty() {
+        return None;
+    }
+    let mut note = screens_listed(captures);
+    note.push_str("Answer a question about the screen from these screenshots.\n");
+    Some(note)
+}
+
+fn screens_listed(captures: &[(String, u32, u32)]) -> String {
+    let mut note = String::from(
+        "The images attached to this message are this turn's screenshots of the user's screens, in this order:\n",
+    );
     for (index, (screen, width, height)) in captures.iter().enumerate() {
         let what = if screen == WINDOW_CAPTURE {
             "the window the person is working in, at full resolution"
@@ -69,7 +86,6 @@ pub fn companion_engine_note(captures: &[(String, u32, u32)]) -> String {
             index + 1
         ));
     }
-    note.push_str("Point in those pixels with the screenshot's name. Answer from the screenshots; don't edit files or run commands to answer a question about the screen.\n");
     note
 }
 
@@ -94,5 +110,13 @@ mod engine_note_tests {
     #[test]
     fn without_screenshots_it_says_so_and_does_not_point() {
         assert!(companion_engine_note(&[]).contains("[POINT:none]"));
+    }
+
+    #[test]
+    fn an_agent_gets_its_screenshots_without_the_tutor_s_rules() {
+        assert!(super::screens_note(&[]).is_none());
+        let note = super::screens_note(&[("screen1".into(), 1512, 982)]).unwrap();
+        assert!(note.contains("1. screen1: 1512x982 pixels, the primary display"));
+        assert!(!note.contains("POINT") && !note.contains("misty-sketch"));
     }
 }

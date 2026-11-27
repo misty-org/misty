@@ -10,6 +10,7 @@ import { create } from "zustand";
 import { clearUncertainAdmissions } from "../ask/start_invocation";
 import { createSubmitAnswer } from "../ask/submit_answer";
 import { settleRun } from "../ask/settle_run";
+import { flushStreamedText } from "../ask/misty_invocation_events";
 import { startRunReconciler } from "../ask/run_reconciler";
 import { resetMistyDraftAttachments } from "../composer/draft_attachments";
 import { createMistyConversationActions } from "../ask/misty_conversation_actions";
@@ -18,6 +19,7 @@ import { advanceSubmissionEpoch } from "../ask/misty_submission_epoch";
 import { placeUnplacedChats } from "./conversation_space";
 import { onSpaceWindowSwitch, personalSpaceId, useSpaceWindowStore } from "@/features/app-windows";
 import { resetSteering, steerResponse } from "../ask/misty_steering";
+import { notify } from "@misty/ui";
 
 export const useMistyStore = create<MistyState>((set, get) => ({
   ...createMistyPanelState(set, get),
@@ -57,10 +59,27 @@ export const useMistyStore = create<MistyState>((set, get) => ({
     advanceSubmissionEpoch();
     const accountId = get().accountId;
     const invocationId = get().invocationId;
+    flushStreamedText();
     settleRun(set, get, { state: "canceled" });
-    await pauseLocalExecution().catch(() => {});
+    let stopped = true;
+    await pauseLocalExecution().catch(() => {
+      stopped = false;
+    });
     if (invocationId && get().accountId === accountId)
-      await aiSurfaceApi.cancelInvocation(invocationId).catch(() => {});
+      await aiSurfaceApi.cancelInvocation(invocationId).catch(() => {
+        stopped = false;
+      });
+    if (!stopped)
+      notify({
+        message: "Couldn't stop the reply. It may still be running.",
+        tone: "error",
+        action: {
+          label: "Try again",
+          onSelect: () => {
+            if (invocationId) void aiSurfaceApi.cancelInvocation(invocationId).catch(() => {});
+          },
+        },
+      });
   },
   steerResponse: (text, conversationId) => steerResponse(set, get, text, conversationId),
   submit: async () => get().submitAnswer(get().query),

@@ -4,6 +4,7 @@ import { openSettings } from "@/features/settings";
 import { invoke } from "@/native/invoke";
 import { companionAvailable, setCompanionOn, useCompanionOn } from "./companion_on";
 import { useTutorSetup } from "./tutor_setup";
+import { notify } from "@misty/ui";
 
 const tutorSettingsSection = "agents-companion";
 
@@ -24,7 +25,12 @@ function useTutorTray(on: boolean | undefined, ready: boolean | undefined): void
         const { on: current, ready: set } = state.current;
         if (current === undefined) return;
         if (!set) return openSettings(tutorSettingsSection);
-        void setCompanionOn(!current).catch(() => undefined);
+        void setCompanionOn(!current).catch(() =>
+          notify({
+            message: current ? "Couldn't turn the tutor off." : "Couldn't turn the tutor on.",
+            tone: "error",
+          }),
+        );
       }),
       window.listen("misty://tray-tutor-settings", () => openSettings(tutorSettingsSection)),
     ];

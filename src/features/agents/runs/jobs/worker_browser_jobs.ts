@@ -4,6 +4,32 @@ import { invoke } from "@tauri-apps/api/core";
 export const browserRuntimeIdForScope = (scopeId: string) =>
   invoke<string>("browser_runtime_for_scope", { scopeId });
 
+const fileTypes: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  txt: "text/plain",
+  csv: "text/csv",
+  json: "application/json",
+  html: "text/html",
+  md: "text/markdown",
+  zip: "application/zip",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
+
+const typeOf = (name: string) =>
+  fileTypes[name.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+
 export class DeviceOperationNotAttempted extends Error {
   constructor(error: unknown) {
     super(error instanceof Error ? error.message : String(error));
@@ -103,12 +129,46 @@ export async function browserDeviceRequest(job: ClaimedWorkflowNodeJob["job"]) {
     upload?: { id: string; name: string; mimeType: string; byteSize: number; sha256: string };
     taskId?: string;
     downloadUpload?: { downloadId: string; sourceScopeId: string };
+    workingFile?: { runId: string; path: string };
   };
   const input = job.input as {
     attachmentId?: string;
     downloadId?: string;
     sourceScopeId?: string;
+    path?: string;
   };
+  if (input.path !== undefined || config.workingFile) {
+    const working = config.workingFile;
+    if (
+      !working ||
+      working.runId !== job.runId ||
+      working.path !== input.path ||
+      input.attachmentId ||
+      input.downloadId ||
+      config.upload ||
+      config.downloadUpload
+    )
+      throw new DeviceOperationNotAttempted("invalid_task_file");
+    const found = await invoke<{ name: string; data: string }[]>("space_app_agent_files", {
+      runId: working.runId,
+      paths: [working.path],
+    }).catch(() => {
+      throw new DeviceOperationNotAttempted("invalid_task_file");
+    });
+    const file = found[0];
+    const byteSize = file ? atob(file.data).length : 0;
+    if (!file || byteSize > 10 * 1024 * 1024)
+      throw new DeviceOperationNotAttempted("invalid_task_file");
+    const rest: Record<string, unknown> = { ...request.input };
+    delete rest.path;
+    return {
+      ...request,
+      input: {
+        ...rest,
+        file: { name: file.name, mimeType: typeOf(file.name), byteSize, base64: file.data },
+      },
+    };
+  }
   if (input.downloadId || input.sourceScopeId || config.downloadUpload) {
     const source = config.downloadUpload;
     if (

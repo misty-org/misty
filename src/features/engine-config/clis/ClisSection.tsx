@@ -16,6 +16,7 @@ import {
   Mark,
   MenuItem,
   MenuTrigger,
+  notify,
   SetupState,
   Text,
   Tooltip,
@@ -29,7 +30,9 @@ import { useCliUpdateFlow } from "./use_cli_update_flow";
 import { refreshCliStatus, useCliVersionStatus } from "./use_cli_version_status";
 
 function openDocs(url: string) {
-  void openUrl(url).catch(() => {});
+  void openUrl(url).catch(() =>
+    notify({ message: "Couldn't open the link. Try again.", tone: "error" }),
+  );
 }
 
 export function versionText(raw: string): string {
@@ -37,7 +40,7 @@ export function versionText(raw: string): string {
   return `v${number ? number[0] : raw.trim().replace(/^v/i, "")}`;
 }
 
-function uninstallText(kind: CliRemoveKind, name: string): string {
+export function uninstallText(kind: CliRemoveKind, name: string): string {
   const stays = `${name}'s sign-in and settings stay, and you can install it again.`;
   switch (kind) {
     case "misty":

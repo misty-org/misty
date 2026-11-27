@@ -1,4 +1,4 @@
-import { AppLogoImage, LogoTile, Mark, markFor } from "@misty/ui";
+import { LetterTile, LogoTile, Mark, markFor } from "@misty/ui";
 
 const githubLogin = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 
@@ -38,40 +38,34 @@ function brandOf(name: string) {
 export interface PluginMaker {
   name?: string;
   brand?: string;
-  avatar?: string;
 }
 
 export function pluginMaker(item: { author?: string | null; link: string | null }): PluginMaker {
   const author = item.author?.trim() || undefined;
   const owner = githubOwner(item.link);
   const brand = (author && brandOf(author)) || (owner && brandOf(owner)) || undefined;
-  if (brand) return { name: author ?? owner, brand };
-  const login = author && githubLogin.test(author) ? author : owner;
-  return {
-    name: author ?? owner,
-    avatar: login ? `https://github.com/${login}.png?size=160` : undefined,
-  };
+  return brand ? { name: author ?? owner, brand } : { name: author ?? owner };
 }
 
 export function MakerTile({
   maker,
   name,
-  size = "tile",
+  size = "item",
 }: {
   maker: PluginMaker;
   name: string;
-  size?: "tile" | "hero";
+  size?: "item" | "sheet";
 }) {
   if (maker.brand) {
     return (
       <LogoTile size={size}>
-        <Mark of={maker.brand} label={maker.name ?? name} size={size === "hero" ? 81 : 40} />
+        <Mark of={maker.brand} label={maker.name ?? name} size={size === "sheet" ? 63 : 36} />
       </LogoTile>
     );
   }
   return (
-    <LogoTile size={size} cover={Boolean(maker.avatar)}>
-      <AppLogoImage src={maker.avatar} name={maker.name ?? name} size={size} />
+    <LogoTile size={size}>
+      <LetterTile name={name} size={size === "sheet" ? "hero" : "tile"} />
     </LogoTile>
   );
 }

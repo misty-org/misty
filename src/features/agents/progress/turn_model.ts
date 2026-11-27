@@ -42,7 +42,7 @@ export function turnPhrase(props: {
     .reverse()
     .find((item) => item.type === "tool" && item.state === "running");
   if (running?.type === "tool") {
-    const { verb, subject } = toolParts(running.name, true);
+    const { verb, subject } = toolParts(running.name, true, running.args);
     const target = stepTarget(running) || subject;
     return { phrase: target ? `${verb} ${target}` : verb, waiting: false };
   }

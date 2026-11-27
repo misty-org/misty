@@ -12,7 +12,7 @@ import {
 } from "./misty_store_updates";
 import { settleRun } from "../ask/settle_run";
 import { useCollaborationStore } from "../../plans/agent_collaboration";
-import { localChats, markStoredChats } from "./local_chats";
+import { keepUnchangedChats, localChats, markStoredChats } from "./local_chats";
 import { syncLocalChats } from "./local_chat_sync";
 import { submissionEpoch } from "../ask/misty_submission_epoch";
 
@@ -71,7 +71,10 @@ export function createLoadConversations(
         });
         return;
       }
-      const conversations = response.conversations.map(normalizeConversation);
+      const conversations = keepUnchangedChats(
+        get().conversations,
+        response.conversations.map(normalizeConversation),
+      );
       markStoredChats(conversations, accountId);
       if (
         expected &&

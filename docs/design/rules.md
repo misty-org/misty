@@ -37,7 +37,7 @@ baseline only shrinks. Write code that never trips one, rather than code that wa
 - `raw-menu-row`: every menu row is a MenuItem, MenuCheckItem, MenuRadioItem or MenuSubmenu; never a raw DropdownMenu or ContextMenu item
 - `repeated-menu-icon`: a list of like things (models, efforts, folders, agents, chats) is text alone: drop the icon every row repeats, and give rows an icon only when it tells them apart
 - `leading-icon-in-list-row`: list rows start with their text: use ListRow with label, state and menu, and no leading icon
-- `chip-row`: never a row of category chips or section buttons: stack a list's groups as Shelfs or under SectionHeadings, put a page's sections in its rail or sidebar as nested NavRows, filter with CollectionFilterMenu, and put a bar's controls in CollectionControls
+- `chip-row`: never a row of category chips or section buttons: stack a list's groups as Shelfs or under SectionHeadings, give a page's sections headed groups down the page, filter with CollectionFilterMenu, and put a bar's controls in CollectionControls
 - `sparkles-icon`: never the sparkles star (it reads as AI filler): pick an icon for what the thing is, such as Cpu for a model, Globe for web research or ScrollText for a skill
 - `skeleton-fallback`: load a tool's code with lazyTool inside ToolSuspense, which says "Setting up the code editor" and offers Try again; never a skeleton or PaneLoading fallback, which stand in for data only
 - `duckduckgo`: the agent browser opens on a blank page and searches with Google, never DuckDuckGo

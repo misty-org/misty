@@ -21,7 +21,12 @@ import { FilesDialogsHost } from "./dialogs/UseFilesDialogs";
 import { canCreateIn, canPasteIn, createFileActions, fail } from "./file_actions";
 import { canDropIn, carryFiles, draggedItems, takesDrop } from "./file_drag";
 import { collectionItem } from "./FileItems";
-import { useFilesChoices, type FilesPick, type FilesSort } from "./files_choices";
+import {
+  useFilesChoices,
+  type FilesPick,
+  type FilesPickFooter,
+  type FilesSort,
+} from "./files_choices";
 import { handleFilesKey } from "./files_keys";
 import { useFilesReveal } from "./files_reveal";
 import { FilesMain, type BackgroundMenu, type MainListing } from "./FilesMain";
@@ -154,7 +159,7 @@ function PaneBody({
   driveOpen,
 }: {
   slots: PaneSlots;
-  footer?: (picked: FileItem[], open: (item: FileItem) => void) => ReactNode;
+  footer?: FilesPickFooter;
   onTransfers?: () => void;
   driveOpen: { current: (item: FileItem) => void };
 }) {
@@ -175,14 +180,17 @@ function PaneBody({
       : NO_ITEMS
     : (listing.items ?? NO_ITEMS);
   const accept = pick?.accept;
+  const foldersOnly = Boolean(pick?.folders);
   const accepted = useMemo(
     () =>
-      accept?.length
-        ? base.filter(
-            (item) => item.folder || acceptsFile(accept, mimeFromName(item.name), item.name),
-          )
-        : base,
-    [base, accept],
+      foldersOnly
+        ? base.filter((item) => item.folder)
+        : accept?.length
+          ? base.filter(
+              (item) => item.folder || acceptsFile(accept, mimeFromName(item.name), item.name),
+            )
+          : base,
+    [base, accept, foldersOnly],
   );
   const needle = searched ? "" : query.trim().toLocaleLowerCase();
   const items = useArranged(accepted, {
@@ -385,7 +393,7 @@ export function FilesPane({
   granted: boolean;
   start: FilesPlace;
   pick?: FilesPick;
-  footer?: (picked: FileItem[], open: (item: FileItem) => void) => ReactNode;
+  footer?: FilesPickFooter;
   slots: PaneSlots;
   onTransfers?: () => void;
 }) {

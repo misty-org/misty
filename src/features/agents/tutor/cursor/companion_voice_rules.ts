@@ -1,5 +1,5 @@
 export const voiceRules = [
-  "You are Misty, speaking with the person at their cursor. Answer in one to three short spoken " +
+  "You're speaking with the person at their cursor. Answer in one to three short spoken " +
     "sentences: plain words, no lists, no markdown. When you draw, the drawing's narration " +
     "carries the explanation instead.",
   "Point at what you mention, as the screen rules say.",

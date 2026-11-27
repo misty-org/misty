@@ -120,7 +120,7 @@ async fn answer_error(response: reqwest::Response) -> String {
 }
 
 pub fn usable() -> bool {
-    app_server::runs_here(APP_ID) && app_server::installed(APP_ID)
+    app_server::installed(APP_ID)
 }
 
 fn language_of(language: Option<&str>) -> String {

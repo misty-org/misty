@@ -222,7 +222,7 @@ pub(crate) fn chosen<'a>(
             .find(|mode| mode.id == id)
             .ok_or_else(|| format!("This engine has no mode called “{id}”."));
     }
-    closest(modes, legacy.unwrap_or(ModeKind::Asks))
+    closest(modes, legacy.unwrap_or(ModeKind::NoAsking))
         .ok_or_else(|| "This engine has no mode to run in here.".to_string())
 }
 

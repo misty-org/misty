@@ -65,11 +65,6 @@ export const utilityTours = {
         body: "Choose the engine and the model behind it.",
       },
       {
-        target: "agent-permissions",
-        title: "How much it asks",
-        body: "Choose whether it checks with you first or just gets on with it.",
-      },
-      {
         target: "agent-instructions",
         title: "How you like to work",
         body: "Tell it about you and your work, so it doesn't have to ask each time.",

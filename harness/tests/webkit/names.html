@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Names</title>
+<style>.save::before { content: "Save draft"; }</style></head>
+<body>
+  <span id="first">Billing</span><span id="second">postcode</span>
+  <input aria-labelledby="first second">
+  <label>Ship <select><option>2</option><option selected>3</option></select> boxes</label>
+  <button><svg aria-label="Close dialog" width="10" height="10"></svg></button>
+  <button class="save"></button>
+  <button aria-label="Delete row 4">🗑</button>
+  <nav aria-label="Pages"><a href="#a">Next</a></nav>
+  <section aria-label="Order summary"><p>Total</p></section>
+  <input type="checkbox" id="terms"><label for="terms">I agree to the terms</label>
+  <fieldset disabled><legend>Payment</legend><input aria-label="Card name"></fieldset>
+  <input type="checkbox" id="all" aria-label="Select all">
+  <button aria-pressed="mixed">Bold</button>
+  <h3>Shipping</h3>
+  <script>document.getElementById("all").indeterminate = true;</script>
+</body></html>

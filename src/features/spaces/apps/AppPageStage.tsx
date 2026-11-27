@@ -12,6 +12,7 @@ import {
   Pressable,
   SetupState,
 } from "@misty/ui";
+import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -20,7 +21,8 @@ import {
   onBrowserSettled,
   type BrowserBounds,
 } from "@/features/app-windows";
-import { personTone } from "@/features/agents";
+import { AgentAvatar, personTone, showAgentInApp, usePersonalAgentsStore } from "@/features/agents";
+import type { AgentProfile } from "@/shared/schemas";
 import { usePresentedPageHost, visibleBrowserBounds } from "@/features/browser";
 import { invoke } from "@/native";
 import { appZoomChangedEvent } from "@/shared/hooks/use_app_zoom";
@@ -79,6 +81,11 @@ function asked(kinds: string[]): string {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0]!;
 }
 
+function PointerFace({ agentId, name }: { agentId: string; name: string }) {
+  const agent = usePersonalAgentsStore((state) => state.agents.find((item) => item.id === agentId));
+  return <AgentAvatar agent={agent ?? ({ id: agentId, name } as AgentProfile)} size="glyph" />;
+}
+
 export function AppPageStage({
   spaceId,
   appId,
@@ -104,6 +111,7 @@ export function AppPageStage({
   const [mount, setMount] = useState(() => newMount(appId));
   const [opened, setOpened] = useState(false);
   const [presented, setPresented] = useState(false);
+  const [shownOnce, setShownOnce] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const answered = useRef(new Set<string>());
@@ -121,6 +129,11 @@ export function AppPageStage({
   const agent = useAppControl((state) => state.agents[instance]);
   const held = useAppControl((state) => Boolean(state.held[instance]));
   const lowered = Boolean(agent && !held);
+  const shownAgent = agent && presented ? agent.agentId : undefined;
+  useEffect(() => {
+    showAgentInApp(instance, shownAgent);
+    return () => showAgentInApp(instance, undefined);
+  }, [instance, shownAgent]);
   usePresentedPageHost(`app-page:${mount}`, presented);
 
   useEffect(() => {
@@ -130,6 +143,33 @@ export function AppPageStage({
         invoke<{ dataUrl: string; width: number; height: number }>("space_app_page_snapshot", {
           request: { mount },
         }),
+      agent: (operation, args = {}) =>
+        invoke<Record<string, unknown>>("space_app_page_agent", {
+          request: { mount, operation, args },
+        }),
+      input: (action, viewport, editable) =>
+        invoke("space_app_page_input", { request: { mount, action, viewport, editable } }),
+      picture: (input) =>
+        invoke<Record<string, unknown>>("space_app_page_picture", { request: { mount, input } }),
+      emulate: (input) =>
+        invoke<Record<string, unknown>>("space_app_page_emulate", { request: { mount, input } }),
+      pdf: (runId, path) =>
+        invoke<Record<string, unknown>>("space_app_page_pdf", { request: { mount, runId, path } }),
+      history: (direction) =>
+        invoke<Record<string, unknown>>("space_app_page_navigate", {
+          request: { mount, history: direction },
+        }),
+      steps: (input) =>
+        invoke<Record<string, unknown>>("space_app_page_steps", { request: { mount, input } }),
+      onPoint: (listener) => {
+        const stop = listen<{ mount: string; x: number; y: number }>(
+          "misty://app-page-point",
+          (event) => {
+            if (event.payload.mount === mount) listener([event.payload.x, event.payload.y]);
+          },
+        );
+        return () => void stop.then((off) => off());
+      },
     };
     const stopReady = link.onReady(() => {
       if (host.current) startRef.current(link.frame, host.current, page);
@@ -170,6 +210,7 @@ export function AppPageStage({
         void link
           .takeBytes(body.reference)
           .then((data) => saveRef.current({ name, mime, data }))
+          .then(() => notify({ message: `Saved ${name} to Files` }))
           .catch((error: unknown) =>
             notify({
               message: `${name} wasn't saved to Files: ${messageOf(error)}`,
@@ -234,7 +275,10 @@ export function AppPageStage({
       }
       sent = bounds;
       phase = "shown";
-      if (!disposed) setPresented(true);
+      if (!disposed) {
+        setPresented(true);
+        setShownOnce(true);
+      }
     };
     const synchronize = () => {
       frame = 0;
@@ -310,6 +354,7 @@ export function AppPageStage({
     setFailed(null);
     setOpened(false);
     setPresented(false);
+    setShownOnce(false);
     setMount(newMount(appId));
   };
 
@@ -317,12 +362,14 @@ export function AppPageStage({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <PageStage hostRef={host} placed={opened} presented={presented}>
-        <SetupState
-          tool={appName}
-          label={`Setting up ${appName}`}
-          stallAfterMs={APP_START_STALL_MS}
-          onRetry={reopen}
-        />
+        {shownOnce ? null : (
+          <SetupState
+            tool={appName}
+            label={`Setting up ${appName}`}
+            stallAfterMs={APP_START_STALL_MS}
+            onRetry={reopen}
+          />
+        )}
       </PageStage>
       {lowered && presented ? (
         <Pressable
@@ -338,6 +385,8 @@ export function AppPageStage({
             tone={personTone(agent.agentId)}
             left={agent.x * size.width}
             top={agent.y * size.height}
+            doing={agent.doing}
+            face={<PointerFace agentId={agent.agentId} name={agent.name} />}
           />
         </div>
       ) : null}

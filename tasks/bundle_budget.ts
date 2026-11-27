@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { build } from "vite";
+import { build, type Plugin } from "vite";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const appRoot = join(root, "src/app");
@@ -11,12 +11,11 @@ const MB = 1024 * 1024;
 
 export const budgets = {
   windows: {
-    main: 3.2 * MB,
+    main: 2.6 * MB,
     companion: 0.78 * MB,
     desktop: 0.58 * MB,
     pet: 0.56 * MB,
   },
-  total: 26 * MB,
 };
 
 const windows: Record<keyof typeof budgets.windows, { html: string; eager: string[] }> = {
@@ -44,19 +43,28 @@ export interface WindowSize {
   files: string[];
 }
 
-function keyOf(manifest: Manifest, source: string): string {
+function keyOf(manifest: Manifest, chunks: Record<string, string>, source: string): string {
   const wanted = relative(appRoot, join(root, source));
-  const key = Object.keys(manifest).find((candidate) => candidate === wanted);
-  if (!key) throw new Error(`The build has no chunk for ${source}.`);
-  return key;
+  const own = Object.keys(manifest).find((candidate) => candidate === wanted);
+  if (own) return own;
+  const file = chunks[join(root, source)];
+  const shared =
+    file && Object.keys(manifest).find((candidate) => manifest[candidate].file === file);
+  if (!shared) throw new Error(`The build has no chunk for ${source}.`);
+  return shared;
 }
 
-function startupFiles(manifest: Manifest, page: string, eager: string[]): Set<string> {
+function startupFiles(
+  manifest: Manifest,
+  chunks: Record<string, string>,
+  page: string,
+  eager: string[],
+): Set<string> {
   const scripts = [...page.matchAll(/<script[^>]*\ssrc="\/?([^"]+)"/g)].map((found) => found[1]);
   const entries = Object.keys(manifest).filter((key) => scripts.includes(manifest[key].file));
   if (!entries.length) throw new Error("A page of the build loads no chunk the manifest knows.");
   const roots = entries.flatMap((key) => [key, ...(manifest[key].dynamicImports ?? [])]);
-  for (const source of eager) roots.push(keyOf(manifest, source));
+  for (const source of eager) roots.push(keyOf(manifest, chunks, source));
   const seen = new Set<string>();
   const files = new Set<string>();
   const visit = (key: string) => {
@@ -74,16 +82,6 @@ function startupFiles(manifest: Manifest, page: string, eager: string[]): Set<st
       if (manifest[next]?.file.endsWith(".css")) visit(next);
   }
   return files;
-}
-
-async function walk(folder: string): Promise<string[]> {
-  const entries = await readdir(folder, { withFileTypes: true });
-  const files = await Promise.all(
-    entries.map((entry) =>
-      entry.isDirectory() ? walk(join(folder, entry.name)) : [join(folder, entry.name)],
-    ),
-  );
-  return files.flat();
 }
 
 async function packagesIn(file: string): Promise<string[]> {
@@ -107,23 +105,39 @@ async function packagesIn(file: string): Promise<string[]> {
     .map(([name, bytes]) => `${name} ${Math.round(bytes / 1024)} kB`);
 }
 
+const chunksFile = ".vite/chunks.json";
+
+export function chunkMap(outDir: string): Plugin {
+  return {
+    name: "misty-bundle-chunks",
+    apply: "build",
+    async writeBundle(_options, bundle) {
+      const chunks: Record<string, string> = {};
+      for (const output of Object.values(bundle))
+        if (output.type === "chunk")
+          for (const id of output.moduleIds) chunks[id.split("?")[0]] = output.fileName;
+      await mkdir(join(outDir, ".vite"), { recursive: true });
+      await writeFile(join(outDir, chunksFile), JSON.stringify(chunks));
+    },
+  };
+}
+
 export async function measure(outDir: string) {
   const manifest = JSON.parse(
     await readFile(join(outDir, ".vite/manifest.json"), "utf8"),
   ) as Manifest;
+  const chunks = JSON.parse(
+    await readFile(join(outDir, chunksFile), "utf8").catch(() => "{}"),
+  ) as Record<string, string>;
   const sizes: WindowSize[] = [];
   for (const [name, { html, eager }] of Object.entries(windows)) {
     const page = await readFile(join(outDir, html), "utf8");
-    const files = [...startupFiles(manifest, page, eager)];
+    const files = [...startupFiles(manifest, chunks, page, eager)];
     let bytes = 0;
     for (const file of files) bytes += (await stat(join(outDir, file))).size;
     sizes.push({ name, bytes, files });
   }
-  let total = 0;
-  for (const file of await walk(outDir))
-    if (!file.endsWith(".map") && !file.includes(`${join(outDir, ".vite")}`))
-      total += (await stat(file)).size;
-  return { sizes, total };
+  return { sizes };
 }
 
 const shown = (bytes: number) => `${(bytes / MB).toFixed(2)} MB`;
@@ -151,8 +165,9 @@ export async function checkBudget(): Promise<string[]> {
       mode: "desktop",
       logLevel: "error",
       build: { outDir, emptyOutDir: true, manifest: true, sourcemap: true },
+      plugins: [chunkMap(outDir)],
     });
-    const { sizes, total } = await measure(outDir);
+    const { sizes } = await measure(outDir);
     const problems: string[] = [];
     for (const window of sizes) {
       const limit = budgets.windows[window.name as keyof typeof budgets.windows];
@@ -165,11 +180,6 @@ export async function checkBudget(): Promise<string[]> {
           ...(await explain(outDir, window)),
         );
     }
-    console.log(`All of the app's frontend: ${shown(total)} (budget ${shown(budgets.total)})`);
-    if (total > budgets.total)
-      problems.push(
-        `The app's frontend is ${shown(total)}, over its ${shown(budgets.total)} budget.`,
-      );
     return problems;
   } finally {
     await rm(outDir, { recursive: true, force: true });

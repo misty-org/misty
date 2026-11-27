@@ -126,6 +126,8 @@ export const TerminalView = memo(function TerminalView({
         fontFamily,
         fontSize: uiPx(TERMINAL_FONT_SIZE),
         cursorBlink: true,
+        cursorStyle: "bar",
+        cursorWidth: 1,
         scrollback: 5000,
         theme: terminalTheme("panel"),
         macOptionIsMeta: true,

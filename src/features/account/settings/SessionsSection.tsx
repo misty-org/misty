@@ -5,6 +5,7 @@ import { useNow } from "@/shared/hooks/use_now";
 import { DesktopSettingsRow as Row, DesktopSettingsRowSkeleton } from "@/features/settings";
 import { useAuth } from "../sessions/auth_state";
 import { openSignOutSheet } from "../sign-in-sheet/SignOutSheet";
+import { openDeviceApproval } from "../devices/device_approval_store";
 import { deviceSignInApi, sessionsKey, type AccountSession } from "../devices/device_sign_in_api";
 import { sessionLine, sessionName, sortSessions } from "../devices/session_lines";
 
@@ -61,6 +62,11 @@ export function SessionsSection() {
           </Button>
         </Row>
       ))}
+      <Row label="Sign in a device" description="Approve a computer running misty login">
+        <Button variant="secondary" onClick={() => openDeviceApproval()}>
+          Enter code
+        </Button>
+      </Row>
     </>
   );
 }

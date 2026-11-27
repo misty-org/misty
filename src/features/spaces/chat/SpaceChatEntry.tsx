@@ -30,6 +30,7 @@ type ChatAction = {
   icon: LucideIcon;
   label: string;
   pressed?: boolean;
+  danger?: boolean;
   onSelect: () => void;
 };
 
@@ -80,6 +81,7 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       id: "leave-group",
       icon: LogOut,
       label: "Leave group",
+      danger: true,
       onSelect: () => setLeaving(true),
     });
   const leaveGroup = async () => {
@@ -101,6 +103,7 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
           key={action.id}
           icon={action.icon}
           label={action.label}
+          danger={action.danger}
           onSelect={action.onSelect}
         />
       ))

@@ -22,6 +22,7 @@ import { personInitials } from "@/shared/lib/person_initials";
 import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { noticesMuted, useMessageNotices } from "@/shared/lib/message_notices";
 import type { Space } from "@/features/spaces";
+import type { AgentProfile } from "@/shared/schemas";
 import {
   ChannelRowMenu,
   conversationName,
@@ -51,10 +52,12 @@ import {
   NavRowLabel,
   Skeleton,
   spaceIcons,
-  VoicePerson,
+  VoiceFaces,
 } from "@misty/ui";
 import { toggleSection, useCollapsedSections } from "./collapsed_sections";
-import { FriendsRow, PersonalSections } from "./PersonalSections";
+import { PersonalSections } from "./PersonalSections";
+import { SidebarPlaces } from "./SidebarPlaces";
+import { SpaceDockNav } from "./SpaceDockNav";
 import { usePlace, useSharedSpaces } from "./place_store";
 import { JoinWithLink } from "./JoinWithLink";
 import { SidebarAgentThreads } from "./SidebarAgentThreads";
@@ -75,6 +78,22 @@ export function useFocusedRoute(): string {
     );
     return pane?.views.find((view) => view.id === pane.activeViewId)?.route ?? "";
   });
+}
+
+function useTabbedAgents(): string[] {
+  const joined = useWorkspaceStore((state) => {
+    const ids = new Set<string>();
+    for (const leaf of dockLeaves(state.layout.root))
+      for (const view of leaf.views) {
+        const [path, query = ""] = (view.route ?? "").split("?");
+        if (path !== "/agents") continue;
+        const params = new URLSearchParams(query);
+        const agent = params.get("view") ? null : params.get("agent");
+        if (agent) ids.add(agent);
+      }
+    return [...ids].sort().join(",");
+  });
+  return useMemo(() => (joined ? joined.split(",") : []), [joined]);
 }
 
 function RowSkeletons({ count }: { count: number }) {
@@ -153,24 +172,23 @@ function SpaceSections({
             <NavRowLabel bright={here} className="flex-1">
               {conversation.title}
             </NavRowLabel>
+            <VoiceFaces
+              people={people.map((userId) => {
+                const member = members?.find((candidate) => candidate.user_id === userId);
+                const name = member?.name ?? "Someone";
+                return {
+                  name,
+                  speaking: here && speaking.includes(userId),
+                  avatar: (
+                    <Avatar size="xs" outline={avatarOutline(member?.avatar_decoration)}>
+                      <AvatarFallback>{personInitials(name)}</AvatarFallback>
+                    </Avatar>
+                  ),
+                };
+              })}
+            />
           </NavRow>
         </ChannelRowMenu>
-        {people.map((userId) => {
-          const member = members?.find((candidate) => candidate.user_id === userId);
-          const name = member?.name ?? "Someone";
-          return (
-            <VoicePerson
-              key={userId}
-              name={name}
-              speaking={here && speaking.includes(userId)}
-              avatar={
-                <Avatar size="xs" outline={avatarOutline(member?.avatar_decoration)}>
-                  <AvatarFallback>{personInitials(name)}</AvatarFallback>
-                </Avatar>
-              }
-            />
-          );
-        })}
       </div>
     );
   };
@@ -288,6 +306,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const [chatsReadFor, setChatsReadFor] = useState<string | null>(null);
   const lessons = useLessonStore((state) => state.lessons);
   const route = useFocusedRoute();
+  const tabbedAgents = useTabbedAgents();
   const statuses = useChatStatuses();
   useEffect(() => {
     void usePersonalAgentsStore.getState().load(accountId);
@@ -331,12 +350,41 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
   useShortcutHandler("app.open_friends", () => open(friendsRoute), Boolean(space));
 
+  const agentThreads = (shown: AgentProfile[], onClose?: () => void) =>
+    space ? (
+      <SidebarAgentThreads
+        key={shown.length === 1 ? shown[0].id : undefined}
+        agents={shown}
+        chats={chats}
+        statuses={statuses}
+        here={agentPlace}
+        tabbed={tabbedAgents}
+        spaceId={space.id}
+        accountId={accountId}
+        onOpen={(agent) => open(agentChatRoute(agent.id))}
+        onNewThread={(agent) => open(agentChatRoute(agent.id, undefined, true))}
+        onOpenThread={(agent, conversationId) => open(agentChatRoute(agent.id, conversationId))}
+        onOpenShared={(agent, threadId) => open(agentSharedThreadRoute(agent.id, threadId))}
+        onClose={onClose}
+      />
+    ) : null;
+  const agentsByRecency = useMemo(() => {
+    const last = new Map<string, string>();
+    for (const chat of chats)
+      if (chat.agentId && !last.has(chat.agentId)) last.set(chat.agentId, chat.updatedAt);
+    return spaceAgents
+      .filter((agent) => agent.enabled && !agent.system_managed)
+      .map((agent) => ({ agent, at: last.get(agent.id) ?? "" }));
+  }, [chats, spaceAgents]);
+  const agentsLoading = Boolean((conversationsError && !conversations.length) || chatsPending);
+
   const agentRows = space ? (
     <SidebarAgentThreads
       agents={spaceAgents}
       chats={chats}
       statuses={statuses}
       here={agentPlace}
+      tabbed={tabbedAgents}
       spaceId={space.id}
       accountId={accountId}
       onOpen={(agent) => open(agentChatRoute(agent.id))}
@@ -366,6 +414,9 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
       <GlobalCreateSpaceDialog>
         {(create) => (
           <div className="flex min-h-0 flex-1 flex-col">
+            <div className="mt-1.5 flex flex-none flex-col gap-1.5">
+              <SidebarPlaces onOpen={onOpen} />
+            </div>
             <div className="mt-1.5 flex-none">
               <SpaceInvitations />
             </div>
@@ -391,11 +442,6 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         data-tour="sidebar-space"
         data-misty-window-drag-block="true"
       >
-        {space ? (
-          <SpaceSelector space={space} place={place} />
-        ) : spacesPending ? (
-          <Skeleton className="h-4 w-32" />
-        ) : null}
         <Row
           label="Search"
           icon={<Search aria-hidden="true" />}
@@ -403,7 +449,14 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
           onOpen={() => useSearchDialog.getState().setOpen(true)}
           data-tour="sidebar-search"
         />
-        {space && place === "personal" ? <FriendsRow route={route} onOpen={onOpen} /> : null}
+        <SidebarPlaces onOpen={onOpen} />
+        <div className="mt-3">
+          {space ? (
+            <SpaceSelector space={space} place={place} />
+          ) : spacesPending ? (
+            <Skeleton className="h-4 w-32" />
+          ) : null}
+        </div>
       </nav>
       <nav
         className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -411,7 +464,13 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         data-misty-window-drag-block="true"
       >
         {!space ? null : place === "personal" ? (
-          <PersonalSections route={route} onOpen={onOpen} agents={agentRows} />
+          <PersonalSections
+            route={route}
+            onOpen={onOpen}
+            agents={agentsLoading ? agentRows : null}
+            mixedAgents={agentsLoading ? [] : agentsByRecency}
+            renderAgent={(agent, close) => agentThreads([agent], close)}
+          />
         ) : (
           <>
             <SpaceInvitations />
@@ -420,6 +479,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         )}
         {!space && spacesPending ? <RowSkeletons count={6} /> : null}
       </nav>
+      {place === "spaces" && sharedSpaces.length ? <SpaceDockNav /> : null}
     </>
   );
 }

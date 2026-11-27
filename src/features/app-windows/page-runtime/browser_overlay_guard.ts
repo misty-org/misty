@@ -38,8 +38,8 @@ export function checkBrowserOverlayTransparency(): void {
     console.warn(
       "Browser pages are hidden while this overlay is open: these elements paint a background " +
         "behind a page. Keep them transparent and paint only outside the page (margins, gaps, " +
-        "corners).",
-      opaque.map(describe),
+        "corners).\n" +
+        opaque.map(describe).join("\n"),
       opaque,
     );
   });

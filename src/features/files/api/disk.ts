@@ -167,6 +167,7 @@ export const disk = {
     invoke<FolderWatch>("files_watch_open", { path, hidden }),
   watchClose: (id: string) => invoke<void>("files_watch_close", { id }),
   readHead: (path: string, limit: number) => invoke<FileHead>("files_read_head", { path, limit }),
+  readBytes: (path: string) => invoke<ArrayBuffer>("files_read_bytes", { path }),
 
   createFolder: (dir: string, name: string) =>
     invoke<FileEntry>("files_create_folder", { dir, name }),

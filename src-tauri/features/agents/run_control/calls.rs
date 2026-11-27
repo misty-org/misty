@@ -32,30 +32,18 @@ pub async fn tutor_transcribe_sources(
     webview: tauri::Webview,
     language: Option<String>,
 ) -> Result<Vec<TranscribedSource>, String> {
-    use tauri_plugin_dialog::DialogExt;
     let _ = language;
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only Misty's own windows can add sources.".into());
     }
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title("Add recordings")
-        .add_filter(
-            "Audio and video",
-            &[
-                "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "mp4", "m4v", "mov",
-            ],
-        )
-        .pick_files(move |files| {
-            let _ = send.send(files);
-        });
-    let Some(files) = receive.await.ok().flatten() else {
-        return Ok(Vec::new());
-    };
+    let pick = crate::files::pick::Pick::file("Add recordings")
+        .many()
+        .accept(&[
+            "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "mp4", "m4v", "mov",
+        ]);
+    let files = crate::files::pick::pick(&webview, pick).await?;
     let mut sources = Vec::new();
-    for file in files.into_iter().take(10) {
-        let Ok(path) = file.into_path() else { continue };
+    for path in files.into_iter().take(10) {
         let name = path
             .file_name()
             .and_then(|name| name.to_str())

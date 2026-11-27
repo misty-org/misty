@@ -44,35 +44,22 @@ pub async fn agents_prepare_scoped_document(
 }
 
 #[tauri::command]
-pub async fn tutor_pick_sources(
-    app: tauri::AppHandle,
-    webview: tauri::Webview,
-) -> ApiResult<Vec<PreparedAgentDocument>> {
-    use tauri_plugin_dialog::DialogExt;
+pub async fn tutor_pick_sources(webview: tauri::Webview) -> ApiResult<Vec<PreparedAgentDocument>> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err(crate::app::error::ApiError::Message(
             "Only Misty's own windows can add sources.".into(),
         ));
     }
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title("Add sources")
-        .add_filter(
-            "Documents",
-            &[
-                "pdf", "docx", "pptx", "xlsx", "txt", "md", "markdown", "csv", "json", "html",
-            ],
-        )
-        .pick_files(move |files| {
-            let _ = send.send(files);
-        });
-    let Some(files) = receive.await.ok().flatten() else {
-        return Ok(Vec::new());
-    };
+    let pick = crate::files::pick::Pick::file("Add sources")
+        .many()
+        .accept(&[
+            "pdf", "docx", "pptx", "xlsx", "txt", "md", "markdown", "csv", "json", "html",
+        ]);
+    let files = crate::files::pick::pick(&webview, pick)
+        .await
+        .map_err(crate::app::error::ApiError::Message)?;
     let mut prepared = Vec::new();
-    for file in files.into_iter().take(20) {
-        let Ok(path) = file.into_path() else { continue };
+    for path in files.into_iter().take(20) {
         file_access::allow_picked_file(&path, file_access::Access::Read);
         let too_big = file_access::fs::metadata(&path)
             .map(|meta| meta.len() > documents::MAX_AGENT_DOCUMENT_BYTES)

@@ -22,6 +22,9 @@ pub(super) const SCHEMA_VERSION: i64 = 2;
 const WRITER_BUDGET: usize = 32 * 1024 * 1024;
 const MANIFEST_FILE: &str = "manifest.sqlite3";
 const LAST_EVENT: &str = "last_event_id";
+const SCAN_FROM: &str = "scan_from_event_id";
+const SCAN_AFTER: &str = "scan_done_through";
+const PART_MARK: &str = "part:";
 
 pub(super) const PATH: &str = "path";
 pub(super) const IS_DIR: &str = "is_dir";
@@ -306,6 +309,70 @@ pub(super) fn forget_event(manifest: &Connection) -> Result<(), String> {
         .prepare_cached("DELETE FROM search_meta WHERE key = ?1")
         .map_err(manifest_error)?
         .execute(params![LAST_EVENT])
+        .map(|_| ())
+        .map_err(manifest_error)
+}
+
+pub(super) struct Progress {
+    pub from: u64,
+    pub after: Option<String>,
+}
+
+pub(super) fn stored_progress(manifest: &Connection) -> Result<Option<Progress>, String> {
+    let from = manifest
+        .prepare_cached("SELECT value FROM search_meta WHERE key = ?1")
+        .map_err(manifest_error)?
+        .query_row(params![SCAN_FROM], |row| row.get::<_, i64>(0))
+        .optional()
+        .map_err(manifest_error)?;
+    let Some(from) = from else {
+        return Ok(None);
+    };
+    let after = manifest
+        .prepare_cached("SELECT value FROM search_meta WHERE key = ?1")
+        .map_err(manifest_error)?
+        .query_row(params![SCAN_AFTER], |row| row.get::<_, String>(0))
+        .optional()
+        .map_err(manifest_error)?
+        .and_then(|value| value.strip_prefix(PART_MARK).map(str::to_owned));
+    Ok(Some(Progress {
+        from: from as u64,
+        after,
+    }))
+}
+
+pub(super) fn store_progress(
+    manifest: &Connection,
+    from: u64,
+    after: Option<&str>,
+) -> Result<(), String> {
+    let mut statement = manifest
+        .prepare_cached(
+            "INSERT INTO search_meta (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        )
+        .map_err(manifest_error)?;
+    statement
+        .execute(params![SCAN_FROM, from as i64])
+        .map_err(manifest_error)?;
+    match after {
+        Some(part) => statement
+            .execute(params![SCAN_AFTER, format!("{PART_MARK}{part}")])
+            .map(|_| ())
+            .map_err(manifest_error),
+        None => manifest
+            .execute("DELETE FROM search_meta WHERE key = ?1", params![SCAN_AFTER])
+            .map(|_| ())
+            .map_err(manifest_error),
+    }
+}
+
+pub(super) fn forget_progress(manifest: &Connection) -> Result<(), String> {
+    manifest
+        .execute(
+            "DELETE FROM search_meta WHERE key IN (?1, ?2)",
+            params![SCAN_FROM, SCAN_AFTER],
+        )
         .map(|_| ())
         .map_err(manifest_error)
 }

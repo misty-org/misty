@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Keyboard</title></head>
+<body style="height: 3000px">
+  <label for="search">Search</label>
+  <input id="search" autocomplete="off">
+  <ul id="suggestions"></ul>
+  <a id="link" href="#opened">Open in a new tab</a>
+  <p id="out">idle</p>
+  <p id="keys"></p>
+  <form id="chat" onsubmit="event.preventDefault()">
+    <textarea id="message" aria-label="Message"></textarea>
+    <button>Send</button>
+  </form>
+  <p id="shortcut">none</p>
+  <script>
+    const keys = [];
+    const search = document.getElementById("search");
+    search.addEventListener("keydown", (event) => keys.push(event.key));
+    search.addEventListener("input", () => {
+      const list = document.getElementById("suggestions");
+      list.innerHTML = "";
+      if (search.value.length >= 3) for (const word of ["harbor", "harvest"]) if (word.startsWith(search.value)) {
+        const item = document.createElement("li");
+        item.textContent = word;
+        list.append(item);
+      }
+    });
+    document.getElementById("link").addEventListener("click", (event) => {
+      event.preventDefault();
+      document.getElementById("out").textContent = `link meta=${event.metaKey} shift=${event.shiftKey} trusted=${event.isTrusted}`;
+    });
+    window.addEventListener("keydown", (event) => {
+      if (event.metaKey && event.key === "s") { event.preventDefault(); document.getElementById("shortcut").textContent = "saved"; }
+    });
+    document.getElementById("message").addEventListener("keydown", (event) => {
+      if (event.metaKey && event.key === "Enter") document.getElementById("shortcut").textContent = "sent " + document.getElementById("message").value;
+    });
+    window.addEventListener("keydown", (event) => { if (event.target === document.body) document.getElementById("keys").textContent += `down:${event.key} `; });
+    window.addEventListener("keyup", (event) => { if (event.target === document.body) document.getElementById("keys").textContent += `up:${event.key} `; });
+  </script>
+</body>
+</html>

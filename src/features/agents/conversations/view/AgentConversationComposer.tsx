@@ -139,7 +139,9 @@ export function AgentConversationComposer({
   const models = useEngineModels(engine);
 
   const items = [
-    engineModeItem({ conversationId, modes, current: mode, teaching, disabled }),
+    mode && mode.id !== resolveEngineMode(modes, "")?.id
+      ? engineModeItem({ conversationId, modes, current: mode, teaching, disabled })
+      : null,
     modelEffortItem({
       accountId,
       conversationId,

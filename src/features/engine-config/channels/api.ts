@@ -2,6 +2,7 @@
 // See NOTICE.
 
 import { invoke } from "@/native/invoke";
+import { pickPaths } from "@/shared/lib/file_pick";
 
 export interface ChannelView {
   id: string;
@@ -75,6 +76,13 @@ export const channelsApi = {
   ccSwitchDismiss: (hash: string) => invoke<void>("engine_cc_switch_dismiss", { hash }),
   ccSwitchImport: (engine: string) =>
     invoke<CcSwitchImportResult>("engine_cc_switch_import", { engine }),
-  ccSwitchImportFile: (engine: string) =>
-    invoke<CcSwitchImportResult | null>("engine_cc_switch_import_file", { engine }),
+  ccSwitchImportFile: async (engine: string) => {
+    const [path] = await pickPaths({
+      title: "Choose a CC Switch export",
+      accept: ".db,.json,.sqlite",
+    });
+    return path
+      ? invoke<CcSwitchImportResult>("engine_cc_switch_import_file", { engine, path })
+      : null;
+  },
 };

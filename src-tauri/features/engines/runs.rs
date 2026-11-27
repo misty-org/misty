@@ -135,11 +135,16 @@ pub(crate) fn install(app: &AppHandle) -> Result<support::EngineState, String> {
     Ok(state)
 }
 
+pub(super) fn on_cursor(body: &Value) -> bool {
+    body["mode"].as_str() == Some("companion") && body["cursor"].as_bool() == Some(true)
+}
+
 fn tutor_voice(body: &Value) -> bool {
-    body["mode"].as_str() == Some("companion")
-        && body["conversation_id"]
-            .as_str()
-            .is_some_and(|id| id.starts_with("misty_tutor:"))
+    on_cursor(body)
+        || body["mode"].as_str() == Some("companion")
+            && body["conversation_id"]
+                .as_str()
+                .is_some_and(|id| id.starts_with("misty_tutor"))
 }
 
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
@@ -243,8 +248,12 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
     )
     .await;
     let opened = match super::thread_work::Place::of_request(&body) {
-        Some(place) if named.is_empty() && !conversation.is_empty() && !companion_turn => {
-            super::thread_work::open(app, &db, &facts.account, &conversation, &place).await?
+        Some(place)
+            if named.is_empty()
+                && !conversation.is_empty()
+                && (!companion_turn || on_cursor(&body)) =>
+        {
+            Some(super::thread_work::open(app, &db, &facts.account, &conversation, &place).await?)
         }
         _ => None,
     };

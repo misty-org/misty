@@ -78,7 +78,7 @@ async fn merged(
     merge_text(&base, &ours, &theirs).map(String::into_bytes)
 }
 
-fn write_one(
+pub(super) fn write_one(
     drive: &Drive,
     space: &SpaceId,
     path: &str,

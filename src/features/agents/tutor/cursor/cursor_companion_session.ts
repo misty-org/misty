@@ -8,6 +8,7 @@ import { useMistyStore } from "../../conversations/state/use_misty_store";
 import { invoke } from "@tauri-apps/api/core";
 import type { CompanionConversation } from "./companion_conversation";
 import { normalizeCompanionSize } from "./companion_size";
+import { cursorFace } from "./cursor_agent";
 import { useCompanionState } from "./companion_state";
 import { captureScreens, savedPresentation, withLessonCloseUp } from "./cursor_companion_screens";
 import { CursorCompanionPointer } from "./cursor_companion_pointer";
@@ -140,6 +141,7 @@ export class CursorCompanionSession {
       captions: values["agents.companion.captions"] === true,
       tint: String(values["agents.companion.tint"] ?? "white"),
       sprite: values["agents.companion.sprite"] !== false,
+      agent: cursorFace(),
       hint: hintFor(
         values["agents.companion.sprite"] !== false,
         String(values["agents.companion.hintSince"] ?? ""),

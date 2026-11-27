@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { notify, PictureEditorDialog, type PictureEditorResult } from "@misty/ui";
+import { pickFile } from "@/shared/lib/file_pick";
 import { decodedPictureUrl, showPicturePreview } from "@/shared/lib/picture_previews";
 import { MAX_PICTURE_BYTES, PICTURE_TYPES } from "@/shared/lib/square_png";
 
@@ -58,6 +59,7 @@ export function usePictureEditor({
       src={src}
       outline={outline}
       accept={PICTURE_TYPES}
+      onChoose={() => pickFile({ title: "Choose a picture", accept: PICTURE_TYPES })}
       onSave={save}
       onClose={() => setOpen(false)}
     />

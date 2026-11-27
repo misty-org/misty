@@ -1,24 +1,22 @@
 import { ExternalLink, Mic, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { chooseHearing, listen, type HearingModelView, type Listening } from "@/features/voice";
+import { listen, type HearingModelView, type Listening } from "@/features/voice";
 import { openExternalLink } from "@/shared/platform/open_external_link";
 
 import {
   Button,
-  EmptyState,
+  CatalogNames,
   MenuItem,
   notify,
-  ProductInfo,
-  ProductPage,
-  ProductSection,
   SettingsRow,
   SettingsSection,
-  Switch,
+  StoreInfo,
+  StoreSheet,
+  StoreSheetSection,
+  Text,
 } from "@misty/ui";
 import { failureText } from "./explore_index";
-
-import { useBarAction, useExploreNav } from "./explore_view";
 
 import { ActionButton } from "./ListingRows";
 
@@ -30,52 +28,36 @@ import {
   hearingAction,
   languageName,
   speedWords,
-  SpeechFailed,
   useRemove,
   useSpeech,
 } from "./ExploreSpeechParts";
 
-export function SpeechProduct({ id }: { id: string }) {
-  const { catalog, error } = useSpeech();
-  if (!catalog) return error ? <SpeechFailed error={error} /> : null;
-  const model = catalog.hearing.find((one) => one.id === id);
-  return model ? (
-    <HearingProduct model={model} />
-  ) : (
-    <EmptyState
-      inline
-      title="This model isn't listed any more"
-      line="Misty's registry no longer has it."
-    />
-  );
+export function SpeechSheet({ id, onClose }: { id: string; onClose: () => void }) {
+  const { catalog } = useSpeech();
+  const model = catalog?.hearing.find((one) => one.id === id);
+  return model ? <HearingSheet model={model} onClose={onClose} /> : null;
 }
 
-function HearingProduct({ model }: { model: HearingModelView }) {
-  const nav = useExploreNav();
+function HearingSheet({ model, onClose }: { model: HearingModelView; onClose: () => void }) {
   const { settings, stateOf } = useSpeech();
   const current = settings.hearingModel === model.id;
-  const { coming, downloading } = stateOf(model);
-  const action = hearingAction(
-    model,
-    settings.hearingModel,
-    downloading,
-    () => nav.manage({ kind: "hearing", id: model.id }),
-    coming,
-  );
-  useBarAction(action, model.name);
+  const { coming, downloading, failure } = stateOf(model);
+  const action = hearingAction(model, settings.hearingModel, downloading, coming);
+  const { remove, dialog } = useRemove(model, current);
+  const everyLanguage = model.languages.includes("*");
   return (
-    <ProductPage
+    <StoreSheet
+      open
+      onOpenChange={(open) => !open && onClose()}
       logo={
         <MakerTile
           maker={pluginMaker({ author: model.maker, link: model.source })}
           name={model.name}
-          size="hero"
+          size="sheet"
         />
       }
       title={model.name}
-      line={model.description}
       maker={model.maker}
-      onMaker={() => void openExternalLink(model.source)}
       action={<ActionButton action={action} size="md" label={model.name} />}
       menu={
         <MenuItem
@@ -84,37 +66,63 @@ function HearingProduct({ model }: { model: HearingModelView }) {
           onSelect={() => void openExternalLink(model.source)}
         />
       }
-      onHeroOut={nav.setPinned}
       facts={[
         {
           label: "Languages",
-          value: model.languages.includes("*") ? "1,600+" : String(model.languages.length),
-          detail: model.detects_language ? "Finds the language" : "Set in Settings",
+          value: everyLanguage ? "1,600+" : String(model.languages.length),
         },
         { label: "Accuracy", value: accuracyWords[model.accuracy] },
         { label: "Speed", value: speedWords[model.speed] },
-        { label: "Download", value: gigabytes(model.disk_mb) },
-        { label: "Memory", value: gigabytes(model.memory_mb), detail: "While hearing" },
-        { label: "Runs on", value: "sherpa-onnx", detail: "This computer" },
+        { label: "Size", value: gigabytes(model.disk_mb) },
+        { label: "License", value: model.license },
       ]}
     >
+      {model.description || failure ? (
+        <Text as="p" size="body" wrap className="m-0">
+          {failure ?? model.description}
+        </Text>
+      ) : null}
+      <StoreSheetSection title="Languages">
+        {everyLanguage ? (
+          <Text size="meta" tone="muted" wrap>
+            Over 1,600 languages
+          </Text>
+        ) : (
+          <CatalogNames names={model.languages.map(languageName)} />
+        )}
+      </StoreSheetSection>
+      {model.installed ? (
+        <SettingsSection title="On this computer">
+          <SettingsRow
+            label={current ? "In use" : "Downloaded"}
+            description={`For dictation, voice chat, calls and Tutor, ${gigabytes(model.memory_mb)} of memory while hearing`}
+          />
+        </SettingsSection>
+      ) : null}
       {current && model.installed ? <TryHearing /> : null}
-      <ProductSection title="Information">
-        <ProductInfo
+      <StoreSheetSection title="Information">
+        <StoreInfo
           items={[
             { label: "Made by", value: model.maker },
             { label: "License", value: model.license },
             {
-              label: "Languages",
-              value: model.languages.includes("*")
-                ? "Over 1,600"
-                : model.languages.map(languageName).join(", "),
+              label: "Finds the language",
+              value: model.detects_language ? "Yes" : "No, set it in Settings",
             },
+            { label: "Runs on", value: "sherpa-onnx, on this computer" },
             ...(model.credit ? [{ label: "Credit", value: model.credit }] : []),
           ]}
         />
-      </ProductSection>
-    </ProductPage>
+      </StoreSheetSection>
+      {model.installed && remove ? (
+        <div>
+          <Button variant="danger" onClick={remove}>
+            Remove
+          </Button>
+        </div>
+      ) : null}
+      {dialog}
+    </StoreSheet>
   );
 }
 
@@ -144,52 +152,12 @@ function TryHearing() {
     }
   };
   return (
-    <ProductSection title="Try it">
-      <SettingsSection>
-        <SettingsRow label={heard || "Say a sentence"}>
-          <Button size="sm" icon={on ? Square : Mic} onClick={() => void toggle()}>
-            {on ? "Stop" : "Listen"}
-          </Button>
-        </SettingsRow>
-      </SettingsSection>
-    </ProductSection>
-  );
-}
-
-export function SpeechManage({ id }: { id: string }) {
-  const { catalog } = useSpeech();
-  const model = catalog?.hearing.find((one) => one.id === id);
-  if (!model?.installed) return null;
-  return <HearingManage model={model} />;
-}
-
-function HearingManage({ model }: { model: HearingModelView }) {
-  const { settings } = useSpeech();
-  const current = settings.hearingModel === model.id;
-  const { remove, dialog } = useRemove(model, current);
-  return (
-    <>
-      <SettingsSection title={model.name}>
-        <SettingsRow label="Hearing model" description="For dictation, voice chat, calls and Tutor">
-          <Switch
-            checked={current}
-            disabled={current}
-            onCheckedChange={(on) => on && chooseHearing(model.id)}
-            aria-label="Use this hearing model"
-          />
-        </SettingsRow>
-        {remove ? (
-          <SettingsRow
-            label="Remove from this computer"
-            description={`Frees ${gigabytes(model.disk_mb)}`}
-          >
-            <Button variant="danger" size="sm" onClick={remove}>
-              Remove
-            </Button>
-          </SettingsRow>
-        ) : null}
-      </SettingsSection>
-      {dialog}
-    </>
+    <SettingsSection title="Try it">
+      <SettingsRow label={heard || "Say a sentence"}>
+        <Button size="sm" icon={on ? Square : Mic} onClick={() => void toggle()}>
+          {on ? "Stop" : "Listen"}
+        </Button>
+      </SettingsRow>
+    </SettingsSection>
   );
 }

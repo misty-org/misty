@@ -10,7 +10,6 @@ export function AgentRunOutcome({
   remaining,
   failure,
   retryPrompt,
-  retryFrom,
   working,
   onRetry,
   ledger = [],
@@ -22,9 +21,8 @@ export function AgentRunOutcome({
   remaining: UnfinishedItem[];
   failure: string;
   retryPrompt?: string;
-  retryFrom?: string;
   working: boolean;
-  onRetry: (prompt: string, fromMessageId?: string) => void;
+  onRetry: (prompt: string) => void;
   ledger?: LedgerRow[];
   conversationId?: string;
   onResume?: (rows: LedgerRow[], only?: string[]) => void;
@@ -42,7 +40,7 @@ export function AgentRunOutcome({
     );
   const retry =
     retryPrompt && message.retryable !== false ? (
-      <Button variant="primary" disabled={working} onClick={() => onRetry(retryPrompt, retryFrom)}>
+      <Button variant="primary" disabled={working} onClick={() => onRetry(retryPrompt)}>
         Try again
       </Button>
     ) : undefined;

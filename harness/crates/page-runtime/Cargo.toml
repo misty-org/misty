@@ -5,10 +5,20 @@ description = "The in-page agent runtime: accessibility snapshots with refs, act
 edition = "2021"
 license = "AGPL-3.0-or-later"
 publish = false
-rust-version = "1.80"
+rust-version = "1.82"
 
 [lib]
 name = "misty_page_runtime"
 
 [dependencies]
 serde_json = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+base64 = "0.22"
+block2 = "0.6.2"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSEvent", "NSResponder", "NSScreen", "NSView", "NSWindow", "NSTextInputClient", "NSGraphicsContext", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSAppearance", "objc2-core-graphics", "objc2-core-foundation"] }
+objc2-core-foundation = "0.3.2"
+objc2-core-graphics = "0.3.2"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString", "NSRange", "NSGeometry", "NSDate", "NSProcessInfo", "NSObject", "NSDictionary", "NSError", "NSValue", "NSData", "NSArray", "NSHTTPCookie", "block2"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "objc2-app-kit", "objc2-core-foundation", "WKWebView", "WKSnapshotConfiguration", "WKWebViewConfiguration", "WKWebsiteDataStore", "WKHTTPCookieStore", "WKPDFConfiguration", "WKUIDelegate"] }

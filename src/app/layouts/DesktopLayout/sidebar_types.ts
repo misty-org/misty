@@ -4,6 +4,7 @@ export interface SidebarChat {
   updatedAt: string;
   agentId?: string;
   archivedAt?: string;
+  pinnedAt?: string;
   markedUnread?: boolean;
   lastReadAt?: string;
 }

@@ -16,7 +16,6 @@ use std::path::{Path, PathBuf};
 
 use file_access::fs;
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
 
 const SCHEMA_VERSION: u32 = 1;
 const MAX_NAME_CHARS: usize = 64;
@@ -432,31 +431,14 @@ fn write_bundle(parent: &Path, bundle: &BotBundle) -> Result<PathBuf, String> {
     Ok(folder)
 }
 
-async fn pick_folder(app: &AppHandle, title: &str) -> Result<Option<PathBuf>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title(title)
-        .pick_folder(move |folder| {
-            let _ = send.send(folder);
-        });
-    let Some(folder) = receive.await.ok().flatten() else {
-        return Ok(None);
-    };
-    folder
-        .into_path()
-        .map(Some)
-        .map_err(|_| "Choose a folder on this computer.".to_string())
-}
-
 #[tauri::command]
 pub async fn bot_bundle_export(
-    app: AppHandle,
+    webview: tauri::Webview,
     bundle: BotBundle,
 ) -> Result<Option<String>, String> {
     let bundle = validated(bundle)?;
-    let Some(parent) = pick_folder(&app, "Choose where to save the bot").await? else {
+    let pick = crate::files::pick::Pick::folder("Choose where to save the bot");
+    let Some(parent) = crate::files::pick::pick_one(&webview, pick).await? else {
         return Ok(None);
     };
     tauri::async_runtime::spawn_blocking(move || {

@@ -35,12 +35,12 @@ export function setMuted(spaceId: string, muted: boolean): void {
   }));
 }
 
-export function muteWithNotice(muteId: string, message: string): void {
-  setMuted(muteId, true);
+export function setMutedWithNotice(muteId: string, muted: boolean, what: string): void {
+  setMuted(muteId, muted);
   notify({
     id: `mute-${muteId}`,
-    message,
-    action: { label: "Undo", onSelect: () => setMuted(muteId, false) },
+    message: `Notifications ${muted ? "off" : "on"} for ${what}`,
+    action: { label: "Undo", onSelect: () => setMuted(muteId, !muted) },
   });
 }
 
@@ -57,13 +57,13 @@ export function noticesMuted(
   return conversationId !== undefined && prefs.muted.includes(chatMuteId(spaceId, conversationId));
 }
 
-export function useMuted(spaceId: string, muteId: string, notice: string) {
+export function useMuted(spaceId: string, muteId: string, what: string) {
   const space = useMessageNotices((state) => state.value.muted.includes(spaceId));
   const own = useMessageNotices((state) => state.value.muted.includes(muteId));
   const bySpace = space && muteId !== spaceId;
   return {
     muted: space || own,
     bySpace,
-    toggle: () => (own ? setMuted(muteId, false) : muteWithNotice(muteId, notice)),
+    toggle: () => setMutedWithNotice(muteId, !own, what),
   };
 }

@@ -10,7 +10,7 @@ import { useAuth } from "../sessions/auth_state";
 
 const keptAccounts = 200;
 
-const dismissedNotices = createDeviceSetting<Record<string, number>>({
+const useDismissedNotices = createDeviceSetting<Record<string, number>>({
   scope: "account-limit-notices",
   defaults: {},
   normalize: (stored) =>
@@ -20,7 +20,7 @@ const dismissedNotices = createDeviceSetting<Record<string, number>>({
 });
 
 function rememberDismissed(accountId: string, dismissed: boolean) {
-  dismissedNotices.getState().set((current) => {
+  useDismissedNotices.getState().set((current) => {
     const next = { ...current };
     delete next[accountId];
     if (!dismissed) return next;
@@ -53,8 +53,8 @@ export function AccountSuspendedNotice() {
   const notSetUp = useAccountNotSetUp((state) => state.notSetUp);
   const { user } = useAuth();
   const accountId = user?.id;
-  const loaded = dismissedNotices((state) => state.loaded);
-  const dismissed = dismissedNotices((state) =>
+  const loaded = useDismissedNotices((state) => state.loaded);
+  const dismissed = useDismissedNotices((state) =>
     accountId ? accountId in state.value || legacyDismissed(accountId) : false,
   );
   useEffect(() => {

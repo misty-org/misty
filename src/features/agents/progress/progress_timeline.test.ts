@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AiProgressItem } from "@/features/agents/runs/invocations/invocation_types";
+import { useRegistry } from "@/native/registry";
 import {
   groupProgress,
   stepMeta,
@@ -240,6 +241,20 @@ describe("progress timeline", () => {
     expect(toolLabel("file.list", false)).toBe("Listed Files");
     expect(toolLabel("weather.forecast", false)).toBe("Used weather forecast");
     expect(toolLabel("agent.finish", false)).toBe("Wrapped up");
+  });
+
+  it("names connector and app tools without their wire names", () => {
+    useRegistry.setState({ apps: [{ id: "deckcraft", name: "DeckCraft" }] });
+    expect(
+      toolLabel("mcp__misty__app_deckcraft_execute", false, { command: "insert.picture" }),
+    ).toBe("Ran insert picture in DeckCraft");
+    expect(toolLabel("mcp__misty__app_deckcraft_screen_click", true)).toBe("Clicking in DeckCraft");
+    expect(toolLabel("mcp__misty__app_deckcraft_inspect_document", false)).toBe(
+      "Inspected document in DeckCraft",
+    );
+    expect(toolLabel("mcp__misty__file_create", false)).toBe("Created Files");
+    expect(toolLabel("mcp__notion__search", false)).toBe("Searched in Notion");
+    expect(toolLabel("mcp__claude_ai_Gmail__send_email", false)).toBe("Sent email in Gmail");
   });
 });
 

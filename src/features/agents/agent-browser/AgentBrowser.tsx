@@ -3,7 +3,7 @@ import { Globe, Hand, MousePointerClick, PictureInPicture2, Play, ScrollText } f
 import { useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { BrowserNavigationButtons } from "@/features/browser";
-import { Button, IconButton, Input, SidePanelHeader } from "@misty/ui";
+import { Button, IconButton, Input, notify, SidePanelHeader } from "@misty/ui";
 import { AgentBrowserStage } from "./AgentBrowserStage";
 import { AgentBrowserTabs } from "./AgentBrowserTabs";
 import { AgentViewSwitcher } from "./AgentViewSwitcher";
@@ -55,11 +55,13 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   const hold = async (takeOver: boolean) => {
     if (!runId) return;
     if (!takeOver) {
-      await aiSurfaceApi.resumeInvocation(runId).catch(() => false);
-      setHeldRun(undefined);
+      if (await aiSurfaceApi.resumeInvocation(runId).catch(() => false)) setHeldRun(undefined);
+      else
+        notify({ message: "Couldn't hand the page back to the agent. Try again.", tone: "error" });
       return;
     }
     if (await aiSurfaceApi.pauseInvocation(runId).catch(() => false)) setHeldRun(runId);
+    else notify({ message: "Couldn't take over the page. Try again.", tone: "error" });
   };
   const run = (command: string) => {
     if (page) void invoke(command, { request: { id: page } }).catch(() => undefined);

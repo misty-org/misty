@@ -33,12 +33,13 @@ export {
 } from "./list/member_agents";
 export { SpaceChat } from "./chat/SpaceChat";
 export { useChatBar } from "./chat/components/ChatBarButtons";
-export { pageMisty } from "./apps/page_misty";
+export { pageMisty } from "./apps/page_misty_loader";
 export { appCallsHost, voiceChannelPage } from "./apps/app_calls";
 export { SpaceWorkspaceSurface } from "./overview/SpaceWorkspaceSurface";
 export { SpaceWindowBridge } from "./SpaceWindowBridge";
 export { useWindowSpace } from "./components/space-row/use_window_space";
-export { SpaceAvatar, spaceTone } from "./components/SpaceAvatar";
+export { SpaceAvatar, spaceTone, useSpacePicture } from "./components/SpaceAvatar";
+export { useGroupPictureEditor } from "./components/UseGroupPictureEditor";
 export { SpaceBarMenu, SpacePresence } from "./components/space-row/SpaceBarItems";
 export { useSpaceGallery } from "./home/use_space_gallery";
 export { kindIcon } from "./home/GalleryPreview";

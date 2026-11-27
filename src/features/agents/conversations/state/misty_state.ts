@@ -63,6 +63,7 @@ export interface MistyState {
       executionMode: "user" | "agent";
       turn?: number;
       interactionMode?: "team" | "auto";
+      cursor?: boolean;
       idempotencyKey?: string;
       permissionMode?: "ask" | "auto" | "bypass";
       displayCaptures?: DisplayCapture[];

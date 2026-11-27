@@ -6,6 +6,7 @@ pub(crate) mod content_world;
 #[cfg(target_os = "macos")]
 pub(crate) mod corner_scrollbars;
 pub(crate) mod create;
+pub(crate) mod emulated_size;
 pub(crate) mod create_probes;
 pub(crate) mod creation_guard;
 pub(crate) mod first_paint;
@@ -15,6 +16,7 @@ pub(crate) mod linux;
 pub(crate) mod load_watch;
 #[cfg(desktop)]
 pub(crate) mod macos;
+pub(crate) mod native_page;
 pub(crate) mod native_views;
 pub mod process_ended;
 #[cfg(windows)]

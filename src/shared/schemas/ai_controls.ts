@@ -1,16 +1,4 @@
-import { z } from "zod";
-
-export const MistyAiControlsSnapshotSchema = z.strictObject({
-  available: z.boolean(),
-  proposal: z
-    .strictObject({
-      id: z.string().min(1).max(256),
-      kind: z.string().min(1).max(80),
-      state: z.enum(["proposed", "applying", "applied", "rejected", "stale", "failed"]),
-      stale: z.boolean(),
-      replacement: z.string().max(65536).optional(),
-    })
-    .optional(),
-});
+import type * as z from "zod/mini";
+import type { MistyAiControlsSnapshotSchema } from "./ai_controls_schema";
 
 export type MistyAiControlsSnapshot = z.output<typeof MistyAiControlsSnapshotSchema>;

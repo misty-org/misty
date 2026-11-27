@@ -29,11 +29,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const space = spaces.find((item) => item.id === route.activeSpaceId);
   const fallback = hasTauriInternals() ? windowSpace(spaces) : preferredDefaultSpace(spaces);
   const [inviteError, setInviteError] = useState("");
-  useNotice(Boolean(user) && !ready && Boolean(error), {
-    message: "Spaces could not be loaded.",
-    tone: "error",
-    action: { label: "Retry", onSelect: () => void load({ force: true }) },
-  });
   useNotice(Boolean(inviteError), {
     message: inviteError,
     tone: "error",
@@ -59,7 +54,11 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   if (!ready)
     return (
       <Surface tone="page" className="flex h-full min-h-0 flex-col overflow-hidden">
-        <SpacePageLoadingPlaceholder shape={{ section: route.section || "home" }} />
+        {error ? (
+          <SpacePageLoadingPlaceholder onRetry={() => void load({ force: true })} />
+        ) : (
+          <SpacePageLoadingPlaceholder shape={{ section: route.section || "home" }} />
+        )}
       </Surface>
     );
 
@@ -96,9 +95,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   return (
     <>
       <ViewingSpace spaceId={space.id} onView={setViewingSpace} />
-      <Surface
-        as="section"
-        tone="page"
+      <section
         className="relative flex h-full min-h-0 min-w-0 overflow-hidden"
         data-space-workspace={route.activeSpaceId}
         aria-label={`${space?.name ?? "Space"} workspace`}
@@ -114,7 +111,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
             />
           </div>
         </div>
-      </Surface>
+      </section>
     </>
   );
 }

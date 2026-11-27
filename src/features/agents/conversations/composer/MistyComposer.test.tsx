@@ -1,5 +1,9 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const pickFiles = vi.hoisted(() => vi.fn());
+vi.mock("@/shared/lib/file_pick", () => ({ pickFiles }));
+
 import { MistyComposer } from "./MistyComposer";
 import type { MistyImageAttachment } from "../state/conversation_types";
 
@@ -17,7 +21,8 @@ const attachment: MistyImageAttachment = {
 };
 
 describe("MistyComposer", () => {
-  it("enforces the attachment limit", () => {
+  it("enforces the attachment limit", async () => {
+    pickFiles.mockResolvedValue([new File(["image"], "second.png", { type: "image/png" })]);
     const onError = vi.fn();
     render(
       <MistyComposer
@@ -31,11 +36,13 @@ describe("MistyComposer", () => {
         onError={onError}
       />,
     );
-    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
-    fireEvent.change(input!, {
-      target: { files: [new File(["image"], "second.png", { type: "image/png" })] },
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Add" }), {
+      button: 0,
+      pointerType: "mouse",
     });
-    expect(onError).toHaveBeenCalledWith("Misty accepts up to 1 image here.");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Attach files" }));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith("Misty accepts up to 1 image here."));
+    expect(pickFiles).toHaveBeenCalledWith(expect.objectContaining({ multiple: false }));
   });
 
   it("puts the chat's controls in the bar and nothing under the box", () => {

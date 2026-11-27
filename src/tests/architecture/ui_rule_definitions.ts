@@ -234,7 +234,7 @@ export const uiRules = {
     pattern: /\b(?:FilterChip|CollectionFilters|SectionChip)\b/g,
     guidance:
       "never a row of category chips or section buttons: stack a list's groups as Shelfs or under " +
-      "SectionHeadings, put a page's sections in its rail or sidebar as nested NavRows, filter " +
+      "SectionHeadings, give a page's sections headed groups down the page, filter " +
       "with CollectionFilterMenu, and put a bar's controls in CollectionControls",
   },
   "sparkles-icon": {

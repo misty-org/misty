@@ -16,9 +16,11 @@ import { useDirectUserId } from "./direct_account";
 import { useWorkspaceViewTitle, type WorkspaceView } from "@/features/app-windows";
 import { SpaceChat, useChatBar, useSpacesStore } from "@/features/spaces";
 import { DmMembers } from "./DmMembers";
+import { GroupFace } from "./GroupFace";
 import { DmFace, DmProfile, DmWelcome, profileIcon } from "./DmPeople";
 import { directApi, type DirectConversation, type Person } from "./api";
 import { AddPeopleDialog } from "./AddPeopleDialog";
+import { reopenDm, useDmNames } from "./dm_local";
 import { useAnyCall } from "./calls/agent_call_store";
 import { dmOf, useCallStore, useCallsAvailable } from "./calls/call_store";
 import { CallStageView } from "./calls/CallView";
@@ -78,7 +80,9 @@ export function DmView({ tab, dmId }: { tab: WorkspaceView; dmId: string }) {
 function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
   const myId = useDirectUserId();
   const navigate = useNavigate();
+  useDmNames();
   const name = dmName(dm, myId);
+  useEffect(() => reopenDm(dm.id), [dm.id]);
   const others = dmOthers(dm, myId);
   const group = dm.kind === "group";
   const other = group ? undefined : others[0];
@@ -228,7 +232,11 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
           name,
           group,
           readOnly: dm.read_only,
-          face: other ? <DmFace person={other} size="sm" /> : undefined,
+          face: group ? (
+            <GroupFace dm={dm} />
+          ) : other ? (
+            <DmFace person={other} size="sm" />
+          ) : undefined,
           welcome: <DmWelcome dm={dm} name={name} other={other} />,
           members: other ? (
             <DmProfile

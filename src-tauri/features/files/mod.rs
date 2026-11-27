@@ -20,6 +20,7 @@ pub mod entry;
 mod fs_events;
 pub(crate) mod gated;
 pub mod info;
+pub mod pick;
 pub mod listing;
 pub mod open;
 pub mod ops;

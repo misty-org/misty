@@ -1,10 +1,10 @@
 import { useRef, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Button, ChannelReply, InlineLink, RoleMention, Textarea } from "@misty/ui";
+import { Button, ChannelReply, EmojiText, InlineLink, RoleMention, Textarea } from "@misty/ui";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { MessageSpan } from "../../api/dto/common";
-import { ChatAvatar } from "./ChatAvatar";
-import { messageReplyPreviewText } from "./message_text";
+import { ChatAgentAvatar, ChatAvatar } from "./ChatAvatar";
+import { isAgentAuthoredMessage, messageReplyPreviewText } from "./message_text";
 import { useSpaceRolesStore } from "../../roles/use_space_roles";
 
 export function messageTextForLinks(spans: MessageSpan[]): string {
@@ -16,14 +16,16 @@ export function messageTextForLinks(spans: MessageSpan[]): string {
 export function Span(props: { span: MessageSpan; plainMentions: boolean }) {
   const { span } = props;
   if (span.type === "text") {
-    if (!props.plainMentions) return <>{span.text}</>;
+    if (!props.plainMentions) return <EmojiText>{span.text}</EmojiText>;
     return span.text
       .split(/(@[\p{L}\p{N}_.'’-]+(?:\s+[\p{Lu}][\p{L}\p{N}_.'’-]*){0,2})/gu)
       .map((part, index) =>
         part.startsWith("@") ? (
           <RoleMention key={index} label={part.slice(1)} />
         ) : (
-          <span key={index}>{part}</span>
+          <span key={index}>
+            <EmojiText>{part}</EmojiText>
+          </span>
         ),
       );
   }
@@ -62,16 +64,20 @@ export function ReplyLine(props: {
   return (
     <ChannelReply
       avatar={
-        <ChatAvatar
-          id={replied.sender_user_id || replied.sender_name}
-          name={replied.sender_name}
-          src={props.avatarUrl || undefined}
-          size="xs"
-          outline={props.avatarOutline}
-        />
+        isAgentAuthoredMessage(replied) ? (
+          <ChatAgentAvatar agentId={replied.sender_agent_id} name={replied.sender_name} size="xs" />
+        ) : (
+          <ChatAvatar
+            id={replied.sender_user_id || replied.sender_name}
+            name={replied.sender_name}
+            src={props.avatarUrl || undefined}
+            size="xs"
+            outline={props.avatarOutline}
+          />
+        )
       }
       name={replied.sender_name}
-      color={props.color}
+      color={isAgentAuthoredMessage(replied) ? undefined : props.color}
       text={messageReplyPreviewText(replied)}
       onOpen={props.onOpen}
     />

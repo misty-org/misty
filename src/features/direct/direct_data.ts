@@ -17,6 +17,7 @@ import {
   type SharedSpace,
 } from "./api";
 import { readAvatarDecoration, type AvatarDecoration } from "@/shared/lib/avatar_decoration";
+import { dmOwnName } from "./dm_local";
 
 const friendsPath = "/friends";
 const dmsPath = "/dms";
@@ -218,9 +219,19 @@ export function dmOthers(dm: DirectConversation, myUserId: string | undefined) {
 }
 
 export function dmName(dm: DirectConversation, myUserId: string | undefined): string {
+  if (dm.kind === "group") return dm.name || dmMembersName(dm, myUserId);
+  return dmOwnName(dm.id) || dmMembersName(dm, myUserId);
+}
+
+export function dmMembersName(dm: DirectConversation, myUserId: string | undefined): string {
   const others = dmOthers(dm, myUserId);
   if (!others.length) return "Just you";
   return others.map((member) => member.username).join(", ");
+}
+
+export async function renameGroupDm(dmId: string, name: string): Promise<void> {
+  const renamed = await directApi.renameGroupDm(dmId, name);
+  updateDms((current) => current.map((dm) => (dm.id === dmId ? renamed : dm)));
 }
 
 export const dmPath = (dmId: string) => `/dms/${encodeURIComponent(dmId)}`;

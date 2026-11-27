@@ -31,11 +31,7 @@ import {
   type ReactNode,
 } from "react";
 import { useSettingReset } from "../device-preferences/SettingScope";
-import {
-  type DesktopSettingsNavGroup,
-  type DesktopSettingsPageSection,
-  SettingsNavigation,
-} from "./SettingsNavigation";
+import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
 const SettingsBarSlotContext = createContext<HTMLElement | null | undefined>(undefined);
 const SectionActionContext = createContext<((action?: SectionHeadingAction) => void) | null>(null);
@@ -62,9 +58,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
           activeId={props.activeId}
           label={props.navigationLabel}
           onSelect={props.onSelect}
-          sections={props.sections}
-          activeSection={props.activeSection}
-          onSection={props.onSection}
         />
       )}
       {props.navigationFooter ? (
@@ -353,9 +346,6 @@ interface DesktopSettingsFrameProps<Id extends string> {
   corner?: ReactNode;
   navigationTour?: string;
   onSelect: (id: Id) => void;
-  sections?: readonly DesktopSettingsPageSection[];
-  activeSection?: string;
-  onSection?: (id: string) => void;
   presentation?: "page" | "overlay";
   title: ReactNode;
   back?: ReactNode;

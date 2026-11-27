@@ -97,6 +97,13 @@ pub async fn browser_webview_create(
         ))
         .initialization_script(browser_status_script(&shortcut_token))
         .initialization_script(kiri::page_script())
+        .initialization_script(misty_page_runtime::PAGE);
+    let builder = if is_agent_page(&request.id) {
+        builder.initialization_script(misty_page_runtime::WEBMCP)
+    } else {
+        builder
+    };
+    let builder = builder
         .on_navigation(move |url| external_url(url.as_str()).is_ok())
         .on_new_window(move |url, features| new_window(&popup_app, &popup_id, url, features))
         .on_page_load(move |webview, payload| {

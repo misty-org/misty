@@ -207,6 +207,14 @@ function describeStep(step: RunStep, options: { folder?: string; page?: string }
     if (action === "visual") return `Looked at ${page}`;
     if (action === "close" || action.endsWith("close")) return `Closed ${page}`;
     if (action === "skill") return `Used a saved routine on ${page}`;
+    if (action === "console") return `Checked the console on ${page}`;
+    if (action === "network") return `Checked the requests on ${page}`;
+    if (action === "storage") return `Checked the stored data on ${page}`;
+    if (action === "verify") return `Checked ${page}`;
+    if (action === "highlight") return `Pointed something out on ${page}`;
+    if (action === "emulate") return `Changed how ${page} is shown`;
+    if (action === "pdf") return `Saved ${page} as a PDF`;
+    if (action === "page_tools") return `Used a tool of ${page}`;
     if (["run", "steps", "eval"].includes(action)) return `Worked on ${page}`;
     return `Read ${page}`;
   }

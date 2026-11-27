@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/features/account";
 import { AgentAvatar, defaultAgentOf, usePersonalAgentsStore } from "@/features/agents";
 import { spaceWorkspaceToolFromRoute, type WorkspaceView } from "@/features/app-windows";
-import { dmOthers, useDms } from "@/features/direct";
+import { dmOthers, GroupFace, useDms } from "@/features/direct";
 import { catalogLogoUrl, ChatAvatar, useMemberPicture, useRegistryApps } from "@/features/spaces";
 import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { SiteIcon, useWebTabs, webTabIdOfRoute } from "@/features/browser";
@@ -42,8 +42,9 @@ function DmTabFace({ dmId }: { dmId: string }) {
   const { user } = useAuth();
   const dms = useDms();
   const dm = dms.data?.find((item) => item.id === dmId);
-  const other = dm ? dmOthers(dm, user?.id)[0] : undefined;
+  const other = dm && dm.kind !== "group" ? dmOthers(dm, user?.id)[0] : undefined;
   const picture = useMemberPicture(other?.user_id ?? "", other?.avatar_version ?? 0);
+  if (dm?.kind === "group") return <GroupFace dm={dm} size="glyph" />;
   if (!other) return null;
   return (
     <ChatAvatar

@@ -1,0 +1,89 @@
+{
+  "page": "names.html",
+  "run": [
+    {
+      "name": "names as Playwright computes them",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~textbox \"Billing postcode\""
+      }
+    },
+    {
+      "name": "a label with a select inside",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~combobox \"Ship boxes\""
+      }
+    },
+    {
+      "name": "an icon button named by its svg",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~button \"Close dialog\""
+      }
+    },
+    {
+      "name": "a name from CSS content",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~button \"Save draft\""
+      }
+    },
+    {
+      "name": "aria-label wins over the text",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~button \"Delete row 4\""
+      }
+    },
+    {
+      "name": "landmarks keep their names",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~navigation \"Pages\""
+      }
+    },
+    {
+      "name": "a named region",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~region \"Order summary\""
+      }
+    },
+    {
+      "name": "a checkbox named by its label",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~checkbox \"I agree to the terms\""
+      }
+    },
+    {
+      "name": "a field in a disabled fieldset is disabled",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~textbox \"Card name\" [disabled]"
+      }
+    },
+    {
+      "name": "a half-checked checkbox",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~checkbox \"Select all\" [mixed]"
+      }
+    },
+    {
+      "name": "a half-pressed toggle",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~button \"Bold\" [pressed=mixed]"
+      }
+    },
+    {
+      "name": "a heading's level",
+      "op": "snapshot",
+      "expect": {
+        "tree": "~heading \"Shipping\" [level=3]"
+      }
+    }
+  ]
+}

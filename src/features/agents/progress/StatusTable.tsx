@@ -1,6 +1,6 @@
-import { Check, Circle, CircleAlert, CircleMinus, CircleX, LoaderCircle } from "lucide-react";
+import { Check, Circle, CircleAlert, CircleMinus, CircleX } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn, Spinner, Surface, Text, type TextTone } from "@misty/ui";
+import { cn, StateMark, Surface, Text, type TextTone } from "@misty/ui";
 import { remCss } from "@misty/ui";
 
 export type StatusState =
@@ -8,7 +8,7 @@ export type StatusState =
 
 const icons = {
   done: Check,
-  running: LoaderCircle,
+  running: Circle,
   next: Circle,
   failed: CircleX,
   waiting: CircleAlert,
@@ -99,7 +99,7 @@ export function StatusRow({
           tone={iconTone[state] ?? "muted"}
           className="flex h-lh shrink-0 items-center self-start"
         >
-          {running ? <Spinner label={false} /> : <Icon aria-hidden="true" />}
+          {running ? <StateMark kind="working" /> : <Icon aria-hidden="true" />}
         </Text>
       ) : null}
       {verb ? (

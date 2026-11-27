@@ -13,13 +13,13 @@ vi.mock("@/features/spaces/overview/SpaceWorkspaceSurface", async (importOrigina
   ...(await importOriginal<Record<string, unknown>>()),
   SpaceWorkspaceSurface: () => <input aria-label="Space draft" defaultValue="Keep my work" />,
 }));
-vi.mock("@/features/agents", async () => {
+vi.mock("@/features/agents/page/AgentsPage", async () => {
   const { lazy, Suspense } = await import("react");
   const FailedModule = lazy(() =>
     Promise.reject(new TypeError("Importing a module script failed.")),
   );
   return {
-    AgentsPage: () => (
+    default: () => (
       <Suspense>
         <FailedModule />
       </Suspense>
@@ -61,7 +61,7 @@ it("contains a rejected lazy module without unmounting another page or navigatio
       <WorkspaceSurface tab={agentsTab} />
     </RenderErrorBoundary>,
   );
-  const draft = screen.getByLabelText("Space draft");
+  const draft = await screen.findByLabelText("Space draft");
   fireEvent.change(draft, { target: { value: "Unsaved work" } });
   await screen.findByText("This tab could not be loaded");
   expect(screen.getByLabelText("Space draft")).toBe(draft);
@@ -74,7 +74,7 @@ it("can navigate to another surface after a tab failed", async () => {
   const { rerender } = render(<WorkspaceSurface tab={agentsTab} />);
   await screen.findByText("This tab could not be loaded");
   rerender(<WorkspaceSurface tab={spaceTab} />);
-  expect(screen.getByLabelText("Space draft")).toBeTruthy();
+  expect(await screen.findByLabelText("Space draft")).toBeTruthy();
   expect(screen.queryByText("This tab could not be loaded")).toBeNull();
 });
 

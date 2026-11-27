@@ -447,42 +447,38 @@ pub async fn engine_cc_switch_import(engine: String) -> Result<CcSwitchImportRes
         .map_err(|e| e.to_string())?
 }
 
-fn import_file(path: &Path, engine: &str) -> Result<CcSwitchImportResult, String> {
+fn import_bytes(source: &Path, bytes: &[u8], engine: &str) -> Result<CcSwitchImportResult, String> {
     let engines = import_engines(engine);
-    if is_json_file(path) {
-        return run_import(|| load_from_json(path, &engines), false);
-    }
-    let copy = std::env::temp_dir().join(format!("misty-cc-switch-{}.db", uuid::Uuid::new_v4()));
-    file_access::fs::copy(path, &copy).map_err(|e| format!("read cc-switch db: {e}"))?;
-    let result = run_import(|| load_from_db(&copy, &engines), false);
+    let json = is_json_file(source);
+    let copy = std::env::temp_dir().join(format!(
+        "misty-cc-switch-{}.{}",
+        uuid::Uuid::new_v4(),
+        if json { "json" } else { "db" }
+    ));
+    file_access::fs::write(&copy, bytes).map_err(|e| format!("read cc-switch file: {e}"))?;
+    let result = if json {
+        run_import(|| load_from_json(&copy, &engines), false)
+    } else {
+        run_import(|| load_from_db(&copy, &engines), false)
+    };
     let _ = file_access::fs::remove_file(&copy);
     result
 }
 
 #[tauri::command]
 pub async fn engine_cc_switch_import_file(
-    app: tauri::AppHandle,
+    webview: tauri::Webview,
     engine: String,
-) -> Result<Option<CcSwitchImportResult>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title("Choose a CC Switch export")
-        .add_filter("CC Switch data", &["db", "json", "sqlite"])
-        .pick_file(move |file| {
-            let _ = send.send(file);
-        });
-    let Some(file) = receive.await.ok().flatten() else {
-        return Ok(None);
-    };
-    let path: PathBuf = file
-        .into_path()
-        .map_err(|_| "Choose a file on this computer.".to_string())?;
-    file_access::allow_picked_file(&path, file_access::Access::Read);
-    tauri::async_runtime::spawn_blocking(move || import_file(&path, &engine).map(Some))
-        .await
-        .map_err(|e| e.to_string())?
+    path: String,
+) -> Result<CcSwitchImportResult, String> {
+    crate::project::person_window(&webview)?;
+    let source = crate::files::asked_path(&path)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = crate::files::info::read_picked(&source)?;
+        import_bytes(&source, &bytes, &engine)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

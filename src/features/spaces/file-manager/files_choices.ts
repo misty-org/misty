@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { createUiMemory, type CollectionZoom } from "@misty/ui";
-import type { FileItem } from "./model";
+import type { ReactNode } from "react";
+import type { FileItem, FilesPlace } from "./model";
 import type { FilesSort } from "./store/arrange_rules";
 
 export type { FilesSort } from "./store/arrange_rules";
@@ -50,8 +51,15 @@ const filesMemory = createUiMemory<FilesChoices>({
 export interface FilesPick {
   accept: readonly string[];
   multiple: boolean;
+  folders?: boolean;
   onPick(items: FileItem[]): void;
 }
+
+export type FilesPickFooter = (
+  picked: FileItem[],
+  open: (item: FileItem) => void,
+  here: FilesPlace,
+) => ReactNode;
 
 export function useFilesChoices(picking: boolean) {
   const memoryKey = picking ? "picker" : "page";

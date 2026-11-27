@@ -73,12 +73,19 @@ export function ChatFolderMenu({ conversationId }: { conversationId: string | un
     if (!current) return;
     const key = conversationId ?? "draft";
     if (allow) {
-      if (await allowFolderChanges(key, current.id).catch(() => false))
-        setWritable(conversationId, current.id, true);
+      const allowed = await allowFolderChanges(key, current.id).catch(() => {
+        notify({ message: "Couldn't let the agent change this folder.", tone: "error" });
+        return false;
+      });
+      if (allowed) setWritable(conversationId, current.id, true);
       return;
     }
-    await stopFolderChanges(key, current.id).catch(() => undefined);
-    setWritable(conversationId, current.id, false);
+    try {
+      await stopFolderChanges(key, current.id);
+      setWritable(conversationId, current.id, false);
+    } catch {
+      notify({ message: "Couldn't turn off changes for this folder. Try again.", tone: "error" });
+    }
   };
   return (
     <DropdownMenu>

@@ -20,6 +20,10 @@ pub(in crate::browser) fn set_webview_bounds_if_changed(
 ) -> Result<(), String> {
     let (position, size) =
         super::fullscreen::fullscreen_bounds(webview).unwrap_or((position, size));
+    let (position, size, zoom) = super::emulated_size::placed(webview, position, size);
+    if let Some(zoom) = zoom {
+        let _ = super::native_page::set_zoom(webview, zoom);
+    }
     let scale = webview
         .window()
         .scale_factor()

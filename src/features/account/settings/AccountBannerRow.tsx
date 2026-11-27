@@ -3,13 +3,13 @@ import type { AccountMeResponse } from "../api/account_types";
 import { useAccountBannerUrl } from "../hooks/use_account_banner_url";
 import { BannerDialog } from "../profile/BannerDialog";
 import { useUserStore } from "../sessions/use_user_store";
-import { Button, FileInput, Surface, useNotice } from "@misty/ui";
-import { useRef, useState } from "react";
+import { Button, Surface, useNotice } from "@misty/ui";
+import { useState } from "react";
 import { DesktopSettingsRow as Row } from "@/features/settings";
+import { pickFile } from "@/shared/lib/file_pick";
 import { PICTURE_TYPES } from "@/shared/lib/square_png";
 
 export function AccountBannerRow({ account }: { account: AccountMeResponse }) {
-  const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
@@ -34,16 +34,15 @@ export function AccountBannerRow({ account }: { account: AccountMeResponse }) {
           <img src={bannerUrl} alt="" draggable={false} className="block size-full object-cover" />
         </Surface>
       ) : null}
-      <FileInput
-        ref={input}
-        accept={PICTURE_TYPES}
-        aria-label="Banner"
-        onChange={(event) => {
-          setFile(event.target.files?.[0] ?? null);
-          event.target.value = "";
-        }}
-      />
-      <Button variant="secondary" disabled={working} onClick={() => input.current?.click()}>
+      <Button
+        variant="secondary"
+        disabled={working}
+        onClick={() =>
+          void pickFile({ title: "Choose a banner", accept: PICTURE_TYPES }).then(
+            (picked) => picked && setFile(picked),
+          )
+        }
+      >
         Change
       </Button>
       {account.banner_version ? (

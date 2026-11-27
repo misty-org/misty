@@ -6,8 +6,21 @@ const SCREEN_MESSAGE = "misty:screen";
 const COMMAND_TIMEOUT_MS = 10_000;
 
 export interface ScreenChannel {
-  command<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T>;
+  command<T = unknown>(
+    name: string,
+    args?: Record<string, unknown>,
+    options?: { timeoutMs?: number },
+  ): Promise<T>;
+  onTools(listener: () => void): () => void;
+  onPoint(listener: (spot: ScreenPoint) => void): () => void;
   dispose(): void;
+}
+
+export interface ScreenPoint {
+  call: string;
+  x: number;
+  y: number;
+  doing?: string;
 }
 
 export class ScreenRefused extends Error {}
@@ -16,6 +29,8 @@ export function createScreenChannel(frame: FrameTarget, onPersonInput: () => voi
   const channel = new MessageChannel();
   const port = channel.port1;
   const waiting = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
+  const toolListeners = new Set<() => void>();
+  const pointListeners = new Set<(spot: ScreenPoint) => void>();
   let next = 1;
   let disposed = false;
   port.onmessage = (event: MessageEvent) => {
@@ -27,6 +42,24 @@ export function createScreenChannel(frame: FrameTarget, onPersonInput: () => voi
       error?: string;
     };
     if (frameIn?.t === "input") return onPersonInput();
+    if (frameIn?.t === "tools") {
+      for (const listener of [...toolListeners]) listener();
+      return;
+    }
+    if (frameIn?.t === "point") {
+      const spot = event.data as Partial<ScreenPoint>;
+      const inside = (value: unknown) =>
+        typeof value === "number" && Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0.5;
+      if (typeof spot.call !== "string") return;
+      const point: ScreenPoint = {
+        call: spot.call,
+        x: inside(spot.x),
+        y: inside(spot.y),
+        doing: typeof spot.doing === "string" && spot.doing ? spot.doing.slice(0, 120) : undefined,
+      };
+      for (const listener of [...pointListeners]) listener(point);
+      return;
+    }
     if (frameIn?.t !== "cmd-res" || typeof frameIn.id !== "number") return;
     const call = waiting.get(frameIn.id);
     if (!call) return;
@@ -36,14 +69,18 @@ export function createScreenChannel(frame: FrameTarget, onPersonInput: () => voi
   };
   frame.postMessage({ type: SCREEN_MESSAGE }, "*", [channel.port2]);
   return {
-    command<T>(name: string, args: Record<string, unknown> = {}) {
+    command<T>(
+      name: string,
+      args: Record<string, unknown> = {},
+      options: { timeoutMs?: number } = {},
+    ) {
       if (disposed) return Promise.reject(new Error("The app has closed."));
       return new Promise<T>((resolve, reject) => {
         const id = next++;
         const timer = window.setTimeout(() => {
           waiting.delete(id);
           reject(new Error("The app didn't answer. It may not have finished loading."));
-        }, COMMAND_TIMEOUT_MS);
+        }, options.timeoutMs ?? COMMAND_TIMEOUT_MS);
         waiting.set(id, {
           resolve: (value) => {
             window.clearTimeout(timer);
@@ -57,9 +94,19 @@ export function createScreenChannel(frame: FrameTarget, onPersonInput: () => voi
         port.postMessage({ t: "cmd", id, name, args });
       });
     },
+    onTools(listener) {
+      toolListeners.add(listener);
+      return () => toolListeners.delete(listener);
+    },
+    onPoint(listener) {
+      pointListeners.add(listener);
+      return () => pointListeners.delete(listener);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
+      toolListeners.clear();
+      pointListeners.clear();
       for (const call of waiting.values()) call.reject(new Error("The app has closed."));
       waiting.clear();
       port.onmessage = null;
@@ -74,6 +121,7 @@ export interface AgentInApp {
   runId?: string;
   x: number;
   y: number;
+  doing?: string;
 }
 
 interface AppControlState {

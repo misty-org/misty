@@ -1,14 +1,6 @@
 import { useAppStore } from "@/app/shell";
 import { Button, ErrorState, RowGroupStack, SearchField } from "@misty/ui";
-import {
-  memo,
-  Suspense,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-  type RefObject,
-} from "react";
+import { memo, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -19,10 +11,7 @@ import {
   TitledSettingsSection,
 } from "./components/DesktopSettingsUI";
 import { SettingsSaveBar } from "./components/SettingsSaveBar";
-import type {
-  DesktopSettingsNavGroup,
-  DesktopSettingsPageSection,
-} from "./components/SettingsNavigation";
+import type { DesktopSettingsNavGroup } from "./components/SettingsNavigation";
 import {
   searchSettings,
   SettingsSearchResults,
@@ -56,73 +45,6 @@ const navGroups = (): DesktopSettingsNavGroup<SettingsSection>[] =>
         : [];
     }),
   }));
-
-const sameSections = (a: DesktopSettingsPageSection[], b: DesktopSettingsPageSection[]) =>
-  a.length === b.length && a.every((item, index) => item.id === b[index]?.id);
-
-function shownSections(root: HTMLElement): DesktopSettingsPageSection[] {
-  return [...root.querySelectorAll<HTMLElement>("[data-settings-section]")]
-    .filter((element) => element.getClientRects().length > 0)
-    .map((element) => ({
-      id: element.dataset.settingsSection ?? "",
-      label: element.dataset.settingsTitle ?? "",
-    }));
-}
-
-function sectionElement(root: HTMLElement | null, id: string) {
-  const sections = root?.querySelectorAll<HTMLElement>("[data-settings-section]") ?? [];
-  return [...sections].find((element) => element.dataset.settingsSection === id) ?? null;
-}
-
-function usePageSections(
-  content: RefObject<HTMLDivElement | null>,
-  page: string,
-  planned: DesktopSettingsPageSection[],
-) {
-  const [shown, setShown] = useState<{ page: string; sections: DesktopSettingsPageSection[] }>();
-  const [reading, setReading] = useState("");
-  useLayoutEffect(() => {
-    const root = content.current;
-    if (!root) return;
-    const read = () => {
-      const here = [...root.querySelectorAll<HTMLElement>("[data-settings-area]")].some(
-        (element) => element.dataset.settingsArea === page && element.getClientRects().length > 0,
-      );
-      if (!here) return;
-      const next = shownSections(root);
-      setShown((current) =>
-        current?.page === page && sameSections(current.sections, next)
-          ? current
-          : { page, sections: next },
-      );
-    };
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(root, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [content, page]);
-  const sections = shown?.page === page ? shown.sections : planned;
-  useLayoutEffect(() => {
-    const root = content.current;
-    const scroller = root?.closest<HTMLElement>("[data-settings-scroller]");
-    if (!root || !scroller) return;
-    const read = () => {
-      const top = scroller.getBoundingClientRect().top + 36;
-      let at = sections[0]?.id ?? "";
-      for (const item of sections) {
-        const element = sectionElement(root, item.id);
-        if (element && element.getBoundingClientRect().top <= top) at = item.id;
-      }
-      if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2)
-        at = sections.at(-1)?.id ?? at;
-      setReading(at);
-    };
-    read();
-    scroller.addEventListener("scroll", read, { passive: true });
-    return () => scroller.removeEventListener("scroll", read);
-  }, [content, sections]);
-  return { sections, reading };
-}
 
 interface SettingsWorkspaceProps {
   presentation?: "page" | "overlay";
@@ -170,16 +92,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
     [entry.area],
   );
   const results = useMemo(() => searchSettings(query), [query]);
-  const planned = useMemo(
-    () =>
-      settingsRegistry.flatMap((item) =>
-        item.area === entry.area && item.title ? [{ id: item.id, label: item.title }] : [],
-      ),
-    [entry.area],
-  );
-  const { sections, reading } = usePageSections(content, entry.area, planned);
-  const jumpTo = (id: string) =>
-    sectionElement(content.current, id)?.scrollIntoView({ block: "start" });
 
   useEffect(() => {
     if (!settings) void load();
@@ -308,9 +220,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
       }}
       saveBar={<SettingsSaveBar />}
       onSelect={(id) => select(id)}
-      sections={settings && sections.length > 1 ? sections : undefined}
-      activeSection={sections.length > 1 ? reading : undefined}
-      onSection={jumpTo}
       presentation={props.presentation}
       title={pageTitle}
       navigationHeader={

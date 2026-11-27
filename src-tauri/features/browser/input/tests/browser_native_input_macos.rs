@@ -1,14 +1,10 @@
 #![allow(dead_code, unused_imports)]
 
-#[path = "../macos/keys.rs"]
-mod keys;
 #[path = "../macos/lock.rs"]
 mod lock;
-#[path = "../macos/native_action.rs"]
-mod native_action;
 
 use lock::set_locked;
-use native_action::perform;
+use misty_page_runtime::macos::perform;
 use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{

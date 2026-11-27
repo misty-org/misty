@@ -25,7 +25,7 @@ import {
   ToolList,
   ToolPath,
   ToolRow,
-  TurnPictures,
+  TurnFold,
   type TurnPicture,
 } from "@misty/ui";
 import { Fold } from "./WorkGroup";
@@ -86,7 +86,7 @@ export function AgentProgress({ items, live = true }: { items: AiProgressItem[];
     </Text>
   ));
   return (
-    <div className="mb-3 grid gap-2">
+    <div className="mb-3 grid gap-3">
       {runsOf(shown).map((run) =>
         run.type === "note" ? (
           <Text key={run.key} as="div" bare tone="default" className="w-full">
@@ -126,7 +126,7 @@ function picturesOf(steps: ProgressTool[]): TurnPicture[] {
     .flatMap((step) =>
       (step.pictures ?? []).map((path) => ({
         src: safeTauriAssetUrl(path),
-        label: toolLabel(step.name, false),
+        label: toolLabel(step.name, false, step.args),
       })),
     )
     .slice(-MOST_PICTURES);
@@ -140,19 +140,29 @@ export function runningOutput(items: AiProgressItem[] | undefined): ReactNode {
 }
 
 function Run({ steps }: { steps: Extract<Entry, { type: "step" }>[] }) {
+  const [open, setOpen] = useState(false);
+  const stepsId = useId();
   const pictures = picturesOf(steps.map((entry) => entry.step));
   return (
-    <div className="grid gap-1">
-      <ToolList label="Steps">
-        {exploreGroups(steps).map((item) =>
-          item.type === "explore" ? (
-            <Explore key={item.key} steps={item.steps} />
-          ) : (
-            <Step key={item.key} step={item.step} />
-          ),
-        )}
-      </ToolList>
-      {pictures.length ? <TurnPictures pictures={pictures} /> : null}
+    <div className="grid">
+      <TurnFold
+        summary={steps.length === 1 ? "1 step" : `${steps.length} steps`}
+        open={open}
+        onToggle={() => setOpen(!open)}
+        controls={stepsId}
+        pictures={pictures.length ? pictures : undefined}
+      />
+      <Fold id={stepsId} open={open} onReveal={() => setOpen(true)}>
+        <ToolList label="Steps">
+          {exploreGroups(steps).map((item) =>
+            item.type === "explore" ? (
+              <Explore key={item.key} steps={item.steps} />
+            ) : (
+              <Step key={item.key} step={item.step} />
+            ),
+          )}
+        </ToolList>
+      </Fold>
     </div>
   );
 }
@@ -207,7 +217,7 @@ function Explore({ steps }: { steps: ProgressStep[] }) {
         <ToolBody>
           {steps.map((step, index) => (
             <Text key={step.id || index} size="meta" tone="muted">
-              {toolParts(step.name, false).verb}{" "}
+              {toolParts(step.name, false, step.args).verb}{" "}
               <Text as="span" bare size="meta" tone="default">
                 {stepTarget(step)}
               </Text>
@@ -242,7 +252,7 @@ function Step({ step }: { step: ProgressStep }) {
   const [open, setOpen] = useState(false);
   const outputId = useId();
   const running = step.state === "running";
-  const { verb } = toolParts(step.name, running);
+  const { verb } = toolParts(step.name, running, step.args);
   const target = stepTarget(step);
   const failed = step.state === "failed";
   const output = exploring(step) ? null : stepOutput(step);

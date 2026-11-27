@@ -10,8 +10,7 @@ export function GrantCards(props: {
   message: GlobalAiMessage;
   working: boolean;
   retryPrompt?: string;
-  retryFrom?: string;
-  onRetry: (prompt: string, fromMessageId?: string) => void;
+  onRetry: (prompt: string) => void;
 }) {
   const grants = props.message.folderGrants ?? [];
   return (
@@ -29,7 +28,6 @@ function GrantCard({
   message,
   working,
   retryPrompt,
-  retryFrom,
   onRetry,
 }: Parameters<typeof GrantCards>[0] & { grant: FolderGrant }) {
   const [busy, setBusy] = useState(false);
@@ -92,11 +90,7 @@ function GrantCard({
               Agents can now work in this folder.
             </Text>
             {retryPrompt ? (
-              <Button
-                variant="secondary"
-                disabled={working}
-                onClick={() => onRetry(retryPrompt, retryFrom)}
-              >
+              <Button variant="secondary" disabled={working} onClick={() => onRetry(retryPrompt)}>
                 <RotateCcw aria-hidden="true" />
                 Retry
               </Button>

@@ -72,11 +72,9 @@ export function hearingAction(
   model: HearingModelView,
   current: string,
   downloading: boolean,
-  manage: () => void,
   coming?: InstallProgress,
-): BarAction {
-  if (model.installed && model.id === current)
-    return { label: "Manage", variant: "secondary", onClick: manage };
+): BarAction | null {
+  if (model.installed && model.id === current) return null;
   if (model.installed)
     return { label: "Use", variant: "secondary", onClick: () => chooseHearing(model.id) };
   return {

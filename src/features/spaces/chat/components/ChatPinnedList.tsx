@@ -15,7 +15,7 @@ import {
 import type { SpaceMessage } from "../../api/dto/entities";
 import { useSpaceCan } from "../../roles/use_space_roles";
 import { useChatSidePanel } from "../chat_side_panel_store";
-import { ChatAvatar } from "./ChatAvatar";
+import { ChatAgentAvatar, ChatAvatar } from "./ChatAvatar";
 import { memberOutlineFor, useMemberAvatarUrls, useMemberOutlines } from "./ChatDisplay";
 
 const noMessages: SpaceMessage[] = [];
@@ -143,17 +143,25 @@ export function ChatPinnedList({
           key={message.id}
           name={message.sender_name}
           avatar={
-            <ChatAvatar
-              id={message.sender_user_id || message.sender_name}
-              name={message.sender_name}
-              size="lg"
-              src={
-                message.origin?.author_avatar_url ||
-                avatars.get(message.sender_user_id) ||
-                undefined
-              }
-              outline={memberOutlineFor(outlines, message)}
-            />
+            message.sender_agent_id ? (
+              <ChatAgentAvatar
+                agentId={message.sender_agent_id}
+                name={message.sender_name}
+                size="lg"
+              />
+            ) : (
+              <ChatAvatar
+                id={message.sender_user_id || message.sender_name}
+                name={message.sender_name}
+                size="lg"
+                src={
+                  message.origin?.author_avatar_url ||
+                  avatars.get(message.sender_user_id) ||
+                  undefined
+                }
+                outline={memberOutlineFor(outlines, message)}
+              />
+            )
           }
           time={stampFormat.format(new Date(message.created_at))}
           dateTime={message.created_at}

@@ -8,6 +8,7 @@ import {
   companionTints,
   EmptyState,
   IconButton,
+  OptionSelect,
   Slider,
   Switch,
   Text,
@@ -15,6 +16,8 @@ import {
   type CompanionTint,
 } from "@misty/ui";
 import { companionAvailable, setCompanionOn, useCompanionOn } from "./companion_on";
+import { cursorAgents, setCursorAgent, useCursorAgent } from "./cursor_agent";
+import { usePersonalAgentsStore } from "../../personal/personal_agents_store";
 import {
   companionSizeDefault,
   companionSizeMax,
@@ -30,7 +33,7 @@ function TutorStyleRow({ onError }: { onError(error: string): void }) {
   const style = useTutorStyle();
   if (!style.length) return null;
   return (
-    <Row label="How Tutor answers" description={style.join(". ")}>
+    <Row label="How it answers" description={style.join(". ")}>
       <Button
         variant="quiet"
         onClick={() => void forgetTutorStyle().catch((reason) => onError(String(reason)))}
@@ -57,6 +60,25 @@ export function tutorStatus(input: {
   return `Ready. Hold ${input.talkKeys} anywhere to talk.`;
 }
 
+function CursorAgentRow({ onError }: { onError(error: string): void }) {
+  const agents = cursorAgents(usePersonalAgentsStore((state) => state.agents));
+  const agent = useCursorAgent();
+  if (!agents.length) return null;
+  return (
+    <Row label="Agent on the cursor">
+      <OptionSelect
+        aria-label="Agent on the cursor"
+        className="w-50 max-w-full"
+        value={agent?.id ?? ""}
+        options={agents.map((item) => ({ value: item.id, label: item.name }))}
+        onValueChange={(id) =>
+          void setCursorAgent(id).catch((reason: unknown) => onError(String(reason)))
+        }
+      />
+    </Row>
+  );
+}
+
 function useTutorErrors() {
   const [error, setError] = useState("");
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
@@ -80,7 +102,7 @@ export function TutorSettings() {
   const setError = useTutorErrors();
   if (!companionAvailable())
     return (
-      <Row label="Tutor" description="Tutor runs in Misty for macOS and Windows.">
+      <Row label="Cursor" description="The cursor runs in Misty for macOS and Windows.">
         {null}
       </Row>
     );
@@ -93,7 +115,7 @@ export function TutorSettings() {
   return (
     <>
       <Row
-        label="Tutor"
+        label="Cursor"
         description={status}
         leading={
           <img
@@ -106,7 +128,7 @@ export function TutorSettings() {
       >
         {setup.ready ? (
           <Switch
-            aria-label="Tutor"
+            aria-label="Cursor"
             checked={on === true}
             disabled={on === undefined}
             onCheckedChange={(next) =>
@@ -119,7 +141,7 @@ export function TutorSettings() {
         <EmptyState
           inline
           title="Pick a default engine"
-          line="Tutor runs on the engine you pick in Settings › Engines."
+          line="The cursor needs an engine you pick in Settings › Engines."
           action={{
             label: "Pick an engine",
             icon: Settings2,
@@ -127,6 +149,7 @@ export function TutorSettings() {
           }}
         />
       ) : null}
+      <CursorAgentRow onError={setError} />
       <TutorStyleRow onError={setError} />
     </>
   );
@@ -142,9 +165,9 @@ export function TutorTalkingSection() {
           {talkKeys()}
         </Text>
       </Row>
-      <Row label="Captions while Tutor talks">
+      <Row label="Captions while it talks">
         <Switch
-          aria-label="Captions while Tutor talks"
+          aria-label="Captions while it talks"
           checked={presentation.captions === true}
           disabled={!control}
           onCheckedChange={(captions) => act({ kind: "captions", captions })}
@@ -160,7 +183,7 @@ export function TutorTourSection() {
   const { control, act } = useTutorControl();
   if (!companionAvailable() || !setup.ready || !on) return null;
   return (
-    <Row label="Tutor tour">
+    <Row label="Cursor tour">
       <Button
         icon={GraduationCap}
         disabled={!control}
@@ -179,11 +202,11 @@ export function TutorBehaviorSection() {
   return (
     <>
       <Row
-        label="Show Misty at the cursor"
-        description="Misty rests beside your pointer. Off, Tutor shows only while you use it."
+        label="Show at the cursor"
+        description="The agent's face rests beside your pointer. Off, it shows only while you use it."
       >
         <Switch
-          aria-label="Show Misty at the cursor"
+          aria-label="Show at the cursor"
           checked={presentation.sprite !== false}
           disabled={!control}
           onCheckedChange={(sprite) => act({ kind: "sprite", sprite })}
@@ -209,7 +232,7 @@ export function TutorBehaviorSection() {
         />
       </Row>
       <Row label="Color">
-        <div role="radiogroup" aria-label="Tutor color" className="flex items-center gap-2">
+        <div role="radiogroup" aria-label="Cursor color" className="flex items-center gap-2">
           {(Object.keys(companionTints) as CompanionTint[]).map((tint) => (
             <ColorSwatch
               key={tint}

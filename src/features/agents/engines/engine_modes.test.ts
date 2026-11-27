@@ -29,7 +29,8 @@ it("maps an older Ask, Auto, Plan or Bypass to the engine's own mode", () => {
   expect(resolveEngineMode(askOrPlan, "bypass")?.id).toBe("default");
   expect(resolveEngineMode(agy, "ask")?.id).toBe("accept-edits");
   expect(resolveEngineMode(askOrPlan, "acceptEdits")?.id).toBe("default");
-  expect(resolveEngineMode(claude, undefined)?.id).toBe("default");
+  expect(resolveEngineMode(claude, undefined)?.id).toBe("bypassPermissions");
+  expect(resolveEngineMode(askOrPlan, undefined)?.id).toBe("default");
 });
 
 it("puts a planning chat in the engine's planning mode where it has one", () => {

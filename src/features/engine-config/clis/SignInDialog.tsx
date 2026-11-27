@@ -24,7 +24,6 @@ import {
   Input,
   Label,
   SetupState,
-  Spinner,
   Surface,
   Text,
   DialogFooter,
@@ -164,7 +163,6 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
         </DialogHeader>
         <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
           <div className="flex items-start gap-3" role="status">
-            {codeSent && running ? <Spinner label={false} className="mt-0.5" /> : null}
             {line === null ? (
               <SetupState size="row" tool="sign-in" onRetry={retry} />
             ) : (
@@ -318,6 +316,8 @@ export function CliTerminal({
           fontFamily: terminalFontFamily(),
           fontSize: uiPx(TERMINAL_FONT_SIZE),
           cursorBlink: true,
+          cursorStyle: "bar",
+          cursorWidth: 1,
           scrollback: 2000,
           theme: terminalTheme(),
           macOptionIsMeta: true,

@@ -3,13 +3,14 @@ import { useCollaborationStore } from "./store";
 import type { ConversationCollaboration, PermissionMode } from "./plan_types";
 import type { EngineModeOption } from "../engines/engine_modes";
 
+export const DEFAULT_PERMISSION_MODE: PermissionMode = "bypass";
+
 export function effectivePermissionMode(
   state: ConversationCollaboration | undefined,
   draft: PermissionMode | "",
-  agentDefault?: PermissionMode,
 ): PermissionMode {
-  if (state) return state.permissionMode || state.agentPermissionMode || agentDefault || "ask";
-  return draft || agentDefault || "ask";
+  if (state) return state.permissionMode || DEFAULT_PERMISSION_MODE;
+  return draft || DEFAULT_PERMISSION_MODE;
 }
 
 export async function chooseEngineMode(
@@ -52,12 +53,12 @@ export async function setPermissionMode(conversationId: string | undefined, mode
   }
 }
 
-export function usePermissionMode(conversationId?: string, agentDefault?: PermissionMode) {
+export function usePermissionMode(conversationId?: string) {
   const state = useCollaborationStore((s) =>
     conversationId ? s.byConversation[conversationId] : undefined,
   );
   const draft = useCollaborationStore((s) => s.draftPermissionMode);
-  return effectivePermissionMode(state, draft, agentDefault);
+  return effectivePermissionMode(state, draft);
 }
 
 export function turnModes(conversationId: string, startsConversation: boolean) {

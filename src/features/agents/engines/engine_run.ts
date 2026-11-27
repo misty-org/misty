@@ -5,7 +5,7 @@ import { warmLocalRun } from "../runs/local-run/start_run";
 import type { AiInvocationRequest } from "../runs/invocations/invocation_types";
 import { followAddress } from "../runs/local-run/local_run_parts";
 import { defaultEngineAgent, resolveDefaultEngine } from "./default_engine";
-import { listEngines } from "./engines_api";
+import { listEngines, mistyEngine } from "./engines_api";
 
 export const noDefaultEngine = "Pick a default engine in Settings › Agents.";
 
@@ -16,6 +16,8 @@ export interface EngineRunInput {
   spaceId?: string;
   history?: { prompt: string; reply?: string; at: string }[];
   companion?: Pick<AiInvocationRequest, "companionMode" | "displayCaptures">;
+  agent?: { id: string; engine: string };
+  conversationId?: string;
   images?: { mimeType: string; dataUrl: string }[];
   onText?(text: string): void;
   onStarted?(runId: string): void;
@@ -52,7 +54,10 @@ export async function warmEngine(input: Omit<EngineRunInput, "prompt">): Promise
 }
 
 async function engineRequest(input: EngineRunInput): Promise<AiInvocationRequest> {
-  const engineId = await defaultEngineId();
+  const engineId =
+    input.agent?.engine && input.agent.engine !== mistyEngine
+      ? input.agent.engine
+      : await defaultEngineId();
   return {
     mode: input.companion ? "companion" : "quick",
     surfaceId: "global",
@@ -60,9 +65,12 @@ async function engineRequest(input: EngineRunInput): Promise<AiInvocationRequest
     prompt: input.prompt,
     context: [],
     engineId,
-    agentId: defaultEngineAgent(engineId),
+    agentId: input.agent?.id ?? defaultEngineAgent(engineId),
     spaceId: input.spaceId,
-    conversationId: `misty_${(input.session ?? input.key).replace(/[^A-Za-z0-9_-]/g, "_")}`,
+    conversationId:
+      input.conversationId ??
+      `misty_${(input.session ?? input.key).replace(/[^A-Za-z0-9_-]/g, "_")}`,
+    cursor: input.agent && input.companion ? true : undefined,
     executionMode: "user",
     collaborationMode: "act",
     permissionMode: "auto",

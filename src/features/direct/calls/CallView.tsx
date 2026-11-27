@@ -33,6 +33,7 @@ import {
   FloatingPip,
   IconButton,
   MenuItem,
+  notify,
   Text,
   ToolbarDivider,
   ZoomControl,
@@ -253,7 +254,10 @@ export function CallStageView() {
     typeof document !== "undefined" && document.pictureInPictureEnabled && video
       ? () => {
           const element = playing.get(video);
-          if (element) void element.requestPictureInPicture().catch(() => undefined);
+          if (element)
+            void element
+              .requestPictureInPicture()
+              .catch(() => notify({ message: "Picture in picture didn't start.", tone: "error" }));
         }
       : undefined;
 

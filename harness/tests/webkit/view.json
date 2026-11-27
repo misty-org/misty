@@ -1,0 +1,21 @@
+{
+  "page": "view.html",
+  "run": [
+    {"name": "the wide layout", "op": "snapshot", "expect": {"tree": "~Wide layout"}},
+    {"name": "a phone-sized page", "op": "emulate", "input": {"width": 390, "height": 844}, "expect": {"ok": true, "width": 390, "height": 844}},
+    {"name": "the page lays out at that size", "op": "page", "js": "return [innerWidth, innerHeight, getComputedStyle(document.getElementById('narrow')).display]", "expect": [390, 844, "block"]},
+    {"name": "a picture of it is that size", "op": "picture", "expect": {"width": 390, "height": 844}},
+    {"name": "a picture of one element at that size", "op": "snapshot", "expect": {"tree": "~Narrow layout"}},
+    {"name": "dark", "op": "emulate", "input": {"colorScheme": "dark"}, "expect": {"colorScheme": "dark"}},
+    {"name": "the page goes dark", "op": "page", "js": "return getComputedStyle(document.body).backgroundColor", "expect": "rgb(0, 0, 0)"},
+    {"name": "light", "op": "emulate", "input": {"colorScheme": "light"}, "expect": {"colorScheme": "light"}},
+    {"name": "print media", "op": "emulate", "input": {"media": "print"}, "expect": {"media": "print"}},
+    {"name": "the page prints", "op": "page", "js": "return getComputedStyle(document.getElementById('screen-only')).display", "expect": "none"},
+    {"name": "too narrow", "op": "emulate", "input": {"width": 100}, "expect": {"tool_error": {"code": "browser_emulate_invalid"}}},
+    {"name": "nothing asked", "op": "emulate", "input": {}, "expect": {"tool_error": {"code": "browser_emulate_invalid"}}},
+    {"name": "back as it was", "op": "emulate", "input": {"reset": true}, "expect": {"ok": true, "width": 1280, "height": 800, "media": "screen"}},
+    {"name": "the page is its own size again", "op": "page", "js": "return [innerWidth, innerHeight]", "expect": [1280, 800]},
+    {"name": "the wide layout again", "op": "page", "js": "return getComputedStyle(document.getElementById('wide')).display", "expect": "block"},
+    {"name": "a PDF of the page", "op": "pdf", "expect": {"pdf": true}}
+  ]
+}

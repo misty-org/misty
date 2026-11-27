@@ -1,0 +1,39 @@
+{
+  "page": "verify.html",
+  "run": [
+    {"name": "the page reads", "op": "snapshot", "expect": {"tree": "~Place order"}},
+    {"name": "everything checks out", "op": "verify", "args": {"checks": [
+      {"kind": "element", "role": "button", "name": "place order"},
+      {"kind": "element", "role": "heading", "name": "Order summary"},
+      {"kind": "text", "text": "Green teapot"},
+      {"kind": "list", "ref": "e2", "items": ["Blue mug", "Green teapot"]},
+      {"kind": "value", "ref": "e3", "value": "Ada"},
+      {"kind": "value", "ref": "e4", "value": true},
+      {"kind": "value", "ref": "e5", "value": "Large"}
+    ]}, "expect": {"ok": true, "passed": true}},
+    {"name": "what fails says why", "op": "verify", "args": {"checks": [
+      {"kind": "element", "role": "button", "name": "Secret button"},
+      {"kind": "element", "role": "button", "name": "Cancel"},
+      {"kind": "text", "text": "Hidden note"},
+      {"kind": "text", "text": "Nowhere"},
+      {"kind": "list", "ref": "e2", "items": ["Blue mug", "Red cup"]},
+      {"kind": "value", "ref": "e3", "value": "Grace"},
+      {"kind": "shape"}
+    ]}, "expect": {"ok": true, "passed": false, "checks": [
+      {"passed": false, "error": "~not visible"},
+      {"passed": false, "error": "~No button named"},
+      {"passed": false, "error": "~not visible"},
+      {"passed": false, "error": "That text is not on the page."},
+      {"passed": false, "error": "~Red cup"},
+      {"passed": false, "value": "Ada"},
+      {"passed": false}
+    ]}},
+    {"name": "a highlight the person sees", "op": "highlight", "args": {"ref": "e1", "label": "Pay here"},
+     "expect": {"ok": true, "highlighted": ["e1"]}},
+    {"name": "it sits on the button", "op": "page", "js": "const host = document.querySelector('[data-misty-highlight]'); const b = document.getElementById('pay').getBoundingClientRect(); return !!host && host.getAttribute('aria-hidden') === 'true' && getComputedStyle(host).pointerEvents === 'none'", "expect": true},
+    {"name": "the tree doesn't list it", "op": "snapshot", "expect": {"tree": "~Place order"}},
+    {"name": "a click still lands on the button", "op": "page", "js": "const b = document.getElementById('pay').getBoundingClientRect(); return document.elementFromPoint(b.left + 4, b.top + 4).id", "expect": "pay"},
+    {"name": "cleared", "op": "highlightClear", "expect": {"ok": true, "highlighted": []}},
+    {"name": "gone", "op": "page", "js": "return document.querySelector('[data-misty-highlight]') === null", "expect": true}
+  ]
+}

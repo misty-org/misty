@@ -1,0 +1,32 @@
+{
+  "page": "keyboard.html",
+  "run": [
+    {"name": "the page reads", "op": "snapshot", "expect": {"tree": "~Search"}},
+    {"name": "type slowly, one key at a time", "op": "steps", "input": {"steps": [{"action": "type", "ref": "e1", "text": "harb", "slowly": true}]},
+     "expect": {"steps": [{"ok": true}]}},
+    {"name": "every key reached the field", "op": "page", "js": "return [document.getElementById('search').value, keys.join('')]", "expect": ["harb", "harb"]},
+    {"name": "the suggestion showed", "op": "page", "js": "return document.getElementById('suggestions').textContent", "expect": "harbor"},
+    {"name": "a click with Meta and Shift held", "op": "steps", "input": {"steps": [{"action": "click", "ref": "e2", "modifiers": ["Meta", "Shift"]}]},
+     "expect": {"steps": [{"ok": true}]}},
+    {"name": "the link saw the modifiers", "op": "page", "js": "return document.getElementById('out').textContent", "expect": "~meta=true shift=true"},
+    {"name": "blur the field", "op": "page", "js": "document.activeElement.blur(); return true", "expect": true},
+    {"name": "press F5", "op": "steps", "input": {"steps": [{"action": "key", "key": "F5"}]}, "expect": {"steps": [{"ok": true}]}},
+    {"name": "hold a key, then let it go", "op": "steps", "input": {"steps": [{"action": "key_down", "key": "d"}, {"action": "key_up", "key": "d"}]},
+     "expect": {"ran": 2, "steps": [{"ok": true}, {"ok": true}]}},
+    {"name": "the page saw the presses", "op": "page", "js": "return document.getElementById('keys').textContent", "expect": "~down:F5 up:F5 down:d up:d"},
+    {"name": "a page's own save shortcut", "op": "steps", "input": {"steps": [{"action": "key", "key": "s", "modifiers": ["Meta"]}]},
+     "expect": {"steps": [{"ok": true, "input": "script"}]}},
+    {"name": "the page saved", "op": "page", "js": "return document.getElementById('shortcut').textContent", "expect": "saved"},
+    {"name": "command enter in a message box asks first", "op": "steps", "input": {"steps": [{"action": "fill", "ref": "e3", "text": "Hi"}, {"action": "key", "ref": "e3", "key": "Enter", "modifiers": ["Meta"]}]},
+     "expect": {"steps": [{"ok": true}, {"ok": false, "errorCode": "browser_consequential_requires_approval"}]}},
+    {"name": "nothing was sent", "op": "page", "js": "return document.getElementById('shortcut').textContent", "expect": "saved"},
+    {"name": "with the person's task it sends", "op": "steps", "input": {"allowConsequential": true, "steps": [{"action": "key", "ref": "e3", "key": "Enter", "modifiers": ["Meta"]}]},
+     "expect": {"steps": [{"ok": true}]}},
+    {"name": "the page sent it", "op": "page", "js": "return document.getElementById('shortcut').textContent", "expect": "sent Hi"},
+    {"name": "a window shortcut never closes the window", "op": "steps", "input": {"steps": [{"action": "key", "key": "w", "modifiers": ["Meta"]}]},
+     "expect": {"steps": [{"ok": true, "input": "script"}]}},
+    {"name": "the page is still here", "op": "page", "js": "return document.title", "expect": "Keyboard"},
+    {"name": "scroll the page down", "op": "steps", "input": {"steps": [{"action": "scroll", "direction": "down", "amount": 1}]}, "expect": {"steps": [{"ok": true}]}},
+    {"name": "the page scrolled", "op": "page", "js": "return scrollY > 300", "expect": true}
+  ]
+}

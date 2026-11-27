@@ -104,13 +104,14 @@ export function useViewConversation(options: {
         handoff: undefined,
         error: null,
       });
-    store.setQuery(drafts.get(viewId) ?? takeSavedDraft(own));
+    const draft = drafts.get(viewId) ?? takeSavedDraft(own);
+    if (useMistyStore.getState().query !== draft) store.setQuery(draft);
   }, [focused, viewId, own, agentId]);
 
   useEffect(() => {
     if (!focused) return;
     if (gainedFocus.current) gainedFocus.current = false;
-    else {
+    else if (followed.current !== storeConversationId) {
       setOwn(storeConversationId);
       followDraft(followed.current, storeConversationId);
       followed.current = storeConversationId;

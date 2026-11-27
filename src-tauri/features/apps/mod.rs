@@ -1,3 +1,4 @@
+pub mod agent_files;
 pub mod app_server;
 pub mod bundle;
 pub mod commands;

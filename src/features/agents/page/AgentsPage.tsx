@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { RotateCw } from "lucide-react";
 import {
+  PaneLoading,
   cn,
-  EmptyState,
-  ErrorState,
+  composerDockClass,
   FramedBar,
   FramedPage,
-  PaneLoading,
+  EmptyState,
+  ErrorState,
   Separator,
   Skeleton,
   SkeletonControl,
@@ -212,7 +213,7 @@ function AgentsPageSkeleton({ chat }: { chat: boolean }) {
               </div>
             )}
           </div>
-          <div className="w-full px-4 pb-1">{composer}</div>
+          <div className={composerDockClass}>{composer}</div>
         </FramedPage>
       </div>
       <Separator orientation="vertical" />

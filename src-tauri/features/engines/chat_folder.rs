@@ -13,7 +13,7 @@ mod retire;
 pub(crate) use retire::retire_agent_folders;
 
 pub(super) const PROJECT: &str = "project";
-const SCRATCH: &str = "scratch";
+pub(crate) const SCRATCH: &str = "scratch";
 const THREAD: &str = "thread";
 
 fn data_dir(db: &Store) -> Option<PathBuf> {
@@ -154,38 +154,20 @@ pub(crate) fn forget_chat(db: &Store, account: &str, conversation: &str) -> Resu
     Ok(())
 }
 
-async fn pick_folder(app: &AppHandle, title: &str) -> Result<Option<PathBuf>, String> {
-    pick_folder_from(app, title, dirs::document_dir()).await
+async fn pick_folder(webview: &tauri::Webview, title: &str) -> Result<Option<PathBuf>, String> {
+    pick_folder_from(webview, title, dirs::document_dir()).await
 }
 
 pub(super) async fn pick_folder_from(
-    app: &AppHandle,
+    webview: &tauri::Webview,
     title: &str,
     start: Option<PathBuf>,
 ) -> Result<Option<PathBuf>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    let mut dialog = app
-        .dialog()
-        .file()
-        .set_title(title)
-        .set_can_create_directories(true);
-    if let Some(start) = start {
-        dialog = dialog.set_directory(start);
-    }
-    dialog.pick_folder(move |folder| {
-        let _ = send.send(folder);
-    });
-    let Some(folder) = receive
-        .await
-        .map_err(|_| "No folder was chosen.".to_string())?
-    else {
-        return Ok(None);
-    };
-    folder
-        .into_path()
-        .map(Some)
-        .map_err(|_| "Choose a folder on this computer.".to_string())
+    crate::files::pick::pick_one(
+        webview,
+        crate::files::pick::Pick::folder(title).start(start),
+    )
+    .await
 }
 
 pub(super) async fn adopt(
@@ -249,14 +231,24 @@ pub async fn chat_folder(
                 return Ok(ChatFolder { path, kind });
             }
         }
-        let scratch = scratch_for(&db, &conversation)?;
-        make(&scratch)?;
-        Ok(ChatFolder {
-            path: scratch.to_string_lossy().into_owned(),
-            kind: SCRATCH.into(),
-        })
+        Ok(waiting_folder(&db, &account, &conversation))
     })
     .await
+}
+
+fn waiting_folder(db: &Store, account: &str, conversation: &str) -> ChatFolder {
+    let saved_scratch = store::chat_folder(db, account, conversation)
+        .is_some_and(|(_, kind)| kind == SCRATCH);
+    match scratch_for(db, conversation) {
+        Ok(scratch) if saved_scratch && file_access::fs::is_dir(&scratch) => ChatFolder {
+            path: scratch.to_string_lossy().into_owned(),
+            kind: SCRATCH.into(),
+        },
+        _ => ChatFolder {
+            path: String::new(),
+            kind: THREAD.into(),
+        },
+    }
 }
 
 #[tauri::command]
@@ -268,7 +260,7 @@ pub async fn chat_folder_choose(
     conversation: Option<String>,
 ) -> Result<Option<String>, String> {
     person_window(&webview)?;
-    let Some(path) = pick_folder(&app, "Choose a project folder").await? else {
+    let Some(path) = pick_folder(&webview, "Choose a project folder").await? else {
         return Ok(None);
     };
     let db = state.environment.store();
@@ -310,14 +302,19 @@ pub async fn chat_folder_scratch(
     state: State<'_, MistyRuntime>,
     account: String,
     conversation: String,
-) -> Result<String, String> {
+) -> Result<ChatFolder, String> {
     person_window(&webview)?;
+    folder_name(&conversation)?;
     let db = state.environment.store();
     blocking(move || {
-        let scratch = scratch_for(&db, &conversation)?;
-        let text = scratch.to_string_lossy().into_owned();
-        store::set_chat_folder(&db, &account, &conversation, &text, SCRATCH)?;
-        Ok(text)
+        store::drop_chat_folder(&db, &account, &conversation, PROJECT)?;
+        if let Some(thread) = super::thread_work::current(&db, &account, &conversation) {
+            return Ok(ChatFolder {
+                path: thread.to_string_lossy().into_owned(),
+                kind: THREAD.into(),
+            });
+        }
+        Ok(waiting_folder(&db, &account, &conversation))
     })
     .await
 }

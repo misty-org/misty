@@ -24,9 +24,9 @@ import { shareScreenAudio } from "./screen_audio";
 import {
   canPickSpeaker,
   rememberSpeaker,
-  savedCallAudio,
+  useSavedCallAudio,
   savedCallDevice,
-  savedNoiseReduction,
+  useSavedNoiseReduction,
   microphoneFailure,
   type CallDeviceKind,
 } from "./call_devices";
@@ -234,7 +234,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
   const [volumes, setVolumes] = useState<ReadonlyMap<string, number>>(new Map());
   const [silentMic, setSilentMic] = useState(false);
   const [offerLowerHand, setOfferLowerHand] = useState(false);
-  const noiseReduction = savedNoiseReduction((state) => state.value);
+  const noiseReduction = useSavedNoiseReduction((state) => state.value);
   const micWanted = useRef<boolean | null>(null);
   const micSettling = useRef(false);
   const deafWanted = useRef(false);
@@ -346,7 +346,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       e2ee: { keyProvider, worker },
       audioCaptureDefaults: {
         deviceId: chosen("audioinput"),
-        noiseSuppression: savedNoiseReduction.getState().value,
+        noiseSuppression: useSavedNoiseReduction.getState().value,
         echoCancellation: true,
         autoGainControl: true,
       },
@@ -437,7 +437,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       .on(RoomEvent.LocalTrackPublished, (publication: LocalTrackPublication) => {
         const track = publication.track;
         if (publication.source === Track.Source.Microphone && track instanceof LocalAudioTrack)
-          void applyNoiseReduction(track, savedNoiseReduction.getState().value).catch(() =>
+          void applyNoiseReduction(track, useSavedNoiseReduction.getState().value).catch(() =>
             notify({ message: "Noise reduction couldn’t start.", tone: "error" }),
           );
         bump();
@@ -522,7 +522,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         live = true;
         playCallSound("join");
         watchAlone();
-        const remembered = savedCallAudio.getState().value;
+        const remembered = useSavedCallAudio.getState().value;
         const quiet = startMuted || remembered.muted;
         if (remembered.deafened) {
           deafWanted.current = true;
@@ -591,7 +591,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         lowered: () => notify({ message: "A moderator lowered your hand." }),
         muted: () => {
           micWanted.current = false;
-          savedCallAudio.getState().set((current) => ({ ...current, muted: true }));
+          useSavedCallAudio.getState().set((current) => ({ ...current, muted: true }));
           notify({ message: "A moderator muted you." });
         },
       },
@@ -688,7 +688,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         on: micOn,
         set: (on) => {
           micWanted.current = on;
-          savedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
+          useSavedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
           void settleMic(room).catch((error: unknown) =>
             notify({
               message: microphoneFailure(error, "The microphone couldn’t be turned on."),
@@ -719,7 +719,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       const on = !deafened;
       deafWanted.current = on;
       signals?.setDeaf(on);
-      savedCallAudio.getState().set((current) => ({ ...current, deafened: on }));
+      useSavedCallAudio.getState().set((current) => ({ ...current, deafened: on }));
       playCallSound(on ? "mute" : "unmute");
     },
     toggleHand: () => signals?.setHand(!handUp),
@@ -743,7 +743,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
     },
     react: (emoji) => signals?.react(emoji),
     setNoiseReduction: (on) => {
-      savedNoiseReduction.getState().set(on);
+      useSavedNoiseReduction.getState().set(on);
       run(async (room) => {
         const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
         if (!(track instanceof LocalAudioTrack)) return;
@@ -782,7 +782,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       const on = micSettling.current
         ? !micWanted.current
         : !room.localParticipant.isMicrophoneEnabled;
-      savedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
+      useSavedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
       micWanted.current = on;
       void settleMic(room).catch((error: unknown) =>
         notify({

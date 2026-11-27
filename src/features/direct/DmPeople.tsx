@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Ban, Hand, Trash2, Users } from "lucide-react";
 import {
+  type AvatarSize,
   Button,
   ChannelWelcome,
   ErrorState,
@@ -9,6 +10,7 @@ import {
   MenuItem,
   NavList,
   NavRow,
+  notify,
   OverflowFadeText,
   PersonProfile,
   PersonProfileSection,
@@ -16,7 +18,6 @@ import {
   profileIcons,
   SkeletonList,
   Text,
-  type AvatarSize,
 } from "@misty/ui";
 import type { CachedResource } from "@/api/cache/cached_resource";
 import { avatarOutline } from "@/shared/lib/avatar_decoration";
@@ -30,6 +31,7 @@ import {
 import type { DirectConversation, Person, SharedSpace } from "./api";
 import { useFriends, useMutualFriends, useSharedSpaces } from "./direct_data";
 import { useOpenDm } from "./DmMembers";
+import { GroupFace } from "./GroupFace";
 import { usePersonBanner } from "./person_banner";
 import { useCustomStatus, usePresence } from "./status_store";
 
@@ -69,7 +71,8 @@ export function DmWelcome({
   if (dm.kind === "group" || !other)
     return (
       <ChannelWelcome
-        icon={Users}
+        icon={dm.kind === "group" ? undefined : Users}
+        mark={dm.kind === "group" ? <GroupFace dm={dm} size="xl" /> : undefined}
         align="center"
         title={name}
         line={`This is the beginning of the ${name} group.`}
@@ -95,7 +98,7 @@ function WaveButton({ dmId, name }: { dmId: string; name: string }) {
     void useSpacesStore
       .getState()
       .sendMessage(dmId, "👋")
-      .catch(() => undefined)
+      .catch(() => notify({ message: "Your wave wasn't sent. Try again.", tone: "error" }))
       .finally(() => setSending(false));
   };
   return (

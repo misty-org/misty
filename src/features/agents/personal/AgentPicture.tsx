@@ -1,7 +1,7 @@
-import { Cloud } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import { personTone } from "@/shared/lib/person_tone";
-import { AgentFace, cn, hasMark, personaTone, type AvatarSize } from "@misty/ui";
+import { personInitials } from "@/shared/lib/person_initials";
+import { AgentFace, cn, personaTone, type AvatarSize } from "@misty/ui";
 import { mistyEngine } from "../engines/misty_engine";
 import { agentCloudAvatar, type agentCloudVariants } from "./agent_cloud_avatars";
 import { personaGlyph } from "../personas/persona_glyph";
@@ -12,6 +12,7 @@ export function AgentAvatar({
   compact = false,
   face = false,
   glyph = false,
+  size: fixedSize,
   className,
 }: {
   agent?: AgentProfile;
@@ -19,9 +20,11 @@ export function AgentAvatar({
   compact?: boolean;
   face?: boolean;
   glyph?: boolean;
+  size?: AvatarSize;
   className?: string;
 }) {
-  const size: AvatarSize = large ? "xl" : glyph ? "glyph" : face ? "sm" : compact ? "xs" : "lg";
+  const size: AvatarSize =
+    fixedSize ?? (large ? "xl" : glyph ? "glyph" : face ? "sm" : compact ? "xs" : "lg");
   const faceClass = cn("agent-avatar", className);
   const tone = agent ? personTone(agent.id) : undefined;
   const avatar = agent?.avatar as
@@ -37,16 +40,6 @@ export function AgentAvatar({
       />
     );
   }
-  if (agent?.engine && agent.engine !== mistyEngine) {
-    const mark = `engine:${agent.engine}`;
-    return hasMark(mark) ? (
-      <AgentFace size={size} mark={mark} tone={tone} className={faceClass} />
-    ) : (
-      <AgentFace size={size} tone={tone} className={faceClass}>
-        {(agent.name.trim()[0] ?? "?").toUpperCase()}
-      </AgentFace>
-    );
-  }
   if (typeof agent?.avatar?.emoji === "string" && agent.avatar.emoji) {
     return (
       <AgentFace size={size} tone={tone} className={faceClass}>
@@ -54,8 +47,15 @@ export function AgentAvatar({
       </AgentFace>
     );
   }
-  if (compact || face || glyph)
-    return <AgentFace size={size} icon={Cloud} tone={tone} className={faceClass} />;
+  if (
+    agent &&
+    (fixedSize || compact || face || glyph || (agent.engine && agent.engine !== mistyEngine))
+  )
+    return (
+      <AgentFace size={size} tone={tone} className={faceClass}>
+        {personInitials(agent.name)}
+      </AgentFace>
+    );
   return (
     <AgentFace size={size} picture className={faceClass}>
       <AgentCloudImage variant={agentCloudAvatar(agent)} fill />

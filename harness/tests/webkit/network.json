@@ -1,0 +1,33 @@
+{
+  "page": "network.html",
+  "run": [
+    {"name": "the page reads", "op": "snapshot", "expect": {"tree": "~Load results"}},
+    {"name": "a click whose answer arrives later", "op": "steps", "input": {"steps": [{"action": "click", "ref": "e1"}]},
+     "expect": {"steps": [{"ok": true, "effect": "page changed"}], "snapshot": {"tree": "~second result"}}},
+    {"name": "the results are on the page", "op": "page", "js": "return document.querySelectorAll('#results li').length", "expect": 2},
+    {"name": "the fetch is in the log", "op": "network", "args": {"filter": "slow"},
+     "expect": {"ok": true, "watched": true, "requests": [{"type": "fetch", "method": "GET", "url": "~/slow.json?ms=1200", "status": 200, "contentType": "application/json"}]},
+     "save": "before"},
+    {"name": "one request in full", "op": "networkRequest", "args": {"id": "$before.requests.0.id"},
+     "expect": {"ok": true, "request": {"type": "fetch", "status": 200, "responseHeaders": {"content-type": "application/json"}, "responseBody": "~second result"}}},
+    {"name": "a request with a sign-in header and a body", "op": "page", "js": "postNote(); return true", "expect": true},
+    {"name": "it lands", "op": "wait", "ms": 400},
+    {"name": "find it", "op": "network", "args": {"filter": "ms=10"}, "expect": {"requests": [{"method": "POST", "detailed": true}]}, "save": "post"},
+    {"name": "its sign-in header is hidden and its body kept", "op": "networkRequest", "args": {"id": "$post.requests.0.id"},
+     "expect": {"request": {"method": "POST", "requestHeaders": {"authorization": "[hidden]", "x-client": "notes", "content-type": "application/json"}, "requestBody": "{\"note\":\"hello\"}"}}},
+    {"name": "a request not in the log", "op": "networkRequest", "args": {"id": 99999}, "expect": {"ok": false, "errorCode": "browser_network_missing"}},
+    {"name": "a failed post", "op": "steps", "input": {"steps": [{"action": "click", "ref": "e2"}]},
+     "expect": {"snapshot": {"tree": "~Sent 404"}}},
+    {"name": "only what came since", "op": "network", "args": {"since": "$before.last", "filter": "missing"},
+     "expect": {"requests": [{"type": "xhr", "method": "POST", "url": "~/missing.json", "status": 404}]}, "save": "xhr"},
+    {"name": "the XMLHttpRequest in full", "op": "networkRequest", "args": {"id": "$xhr.requests.0.id"},
+     "expect": {"request": {"requestBody": "{}", "responseHeaders": {"content-type": "text/plain"}, "responseBody": "Not found"}}},
+    {"name": "the document with static loads", "op": "network", "args": {"includeStatic": true, "filter": "network.html"},
+     "expect": {"requests": [{"type": "document", "url": "~/network.html"}]}},
+    {"name": "a filter", "op": "network", "args": {"filter": "missing"},
+     "expect": {"requests": [{"url": "~missing"}]}},
+    {"name": "cleared", "op": "networkClear", "expect": {"ok": true}},
+    {"name": "nothing after clearing", "op": "network", "args": {}, "expect": {"requests": []}},
+    {"name": "nothing left", "op": "page", "js": "return 0", "expect": 0}
+  ]
+}

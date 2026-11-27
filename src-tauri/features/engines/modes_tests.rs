@@ -32,7 +32,8 @@ fn an_old_choice_takes_the_closest_mode_that_asks_no_less() {
             .id,
         "yolo"
     );
-    assert_eq!(chosen(ENGINE, "", None).unwrap().id, "default");
+    assert_eq!(chosen(ENGINE, "", None).unwrap().id, "yolo");
+    assert_eq!(chosen(&ENGINE[..3], "", None).unwrap().id, "accept");
     assert_eq!(
         chosen(only_asks, "", ModeKind::of_legacy("bypass"))
             .unwrap()

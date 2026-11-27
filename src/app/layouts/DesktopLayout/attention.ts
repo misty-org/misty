@@ -44,9 +44,14 @@ export function attentionByAgent(
   return byAgent;
 }
 
-export function attentionLabel({ count, waiting }: AgentAttention): string {
-  const things = count === 1 ? "thread" : "threads";
-  return waiting ? `${count} ${things} need you or are new` : `${count} new ${things}`;
+export type PlaceMark = {
+  count: number;
+  state?: "waiting" | "results";
+};
+
+function placeState(attention: AgentAttention | undefined): PlaceMark["state"] {
+  if (!attention?.count) return undefined;
+  return attention.waiting ? "waiting" : "results";
 }
 
 export const useSpaceMentions = create<{ bySpace: Record<string, number> }>(() => ({
@@ -130,10 +135,10 @@ function useAgentAttentionBySpace(): {
 }
 
 export function useAttentionCounts(): {
-  personal: number;
-  personalWaiting: boolean;
-  spaces: number;
-  bySpace: Map<string, AgentAttention>;
+  personal: PlaceMark;
+  friendRequests: number;
+  bySpace: Map<string, PlaceMark>;
+  total: number;
 } {
   const dms = useDms().data;
   const friends = useFriends().data;
@@ -146,25 +151,29 @@ export function useAttentionCounts(): {
       noticesMuted(notices, dm.id) ? total : total + Math.max(0, dm.unread_count ?? 0),
     0,
   );
-  const bySpace = new Map<string, AgentAttention>();
-  for (const [id, attention] of agents.bySpace) bySpace.set(id, { ...attention });
-  for (const [id, count] of Object.entries(mentions)) {
-    const held = bySpace.get(id) ?? { count: 0, waiting: false };
-    bySpace.set(id, { ...held, count: held.count + count });
+  const friendRequests = friends?.incoming.length ?? 0;
+  const bySpace = new Map<string, PlaceMark>();
+  const ids = new Set([...agents.bySpace.keys(), ...Object.keys(mentions)]);
+  let agentThreads = agents.personal.count;
+  let mentionTotal = 0;
+  for (const id of ids) {
+    const attention = agents.bySpace.get(id);
+    agentThreads += attention?.count ?? 0;
+    mentionTotal += mentions[id] ?? 0;
+    bySpace.set(id, { count: mentions[id] ?? 0, state: placeState(attention) });
   }
-  const spaces = [...bySpace.values()].reduce((total, item) => total + item.count, 0);
   return {
-    personal: unreadDms + (friends?.incoming.length ?? 0) + agents.personal.count,
-    personalWaiting: agents.personal.waiting,
-    spaces: spaces + invitations,
+    personal: { count: unreadDms, state: placeState(agents.personal) },
+    friendRequests,
     bySpace,
+    total: unreadDms + friendRequests + agentThreads + mentionTotal + invitations,
   };
 }
 
 export function useAppBadge(): void {
   const counts = useAttentionCounts();
   const shown = useMessageNotices((state) => state.value.badge);
-  const total = shown ? counts.personal + counts.spaces : 0;
+  const total = shown ? counts.total : 0;
   useEffect(() => {
     if (!hasTauriInternals()) return;
     void invoke("app_set_badge", { count: total }).catch(() => undefined);

@@ -47,7 +47,7 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   advanced: { label: "Advanced", icon: Wrench },
   agents: { label: "Agents", icon: spaceIcons.agents },
   permissions: { label: "Permissions", icon: ShieldCheck },
-  tutor: { label: "Tutor", icon: MousePointer2 },
+  tutor: { label: "Cursor", icon: MousePointer2 },
   engines: { label: "Engines", icon: appIcons.engines },
 };
 

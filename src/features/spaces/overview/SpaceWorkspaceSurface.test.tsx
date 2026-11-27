@@ -66,6 +66,6 @@ it("shows the load failure and lets users retry a failed snapshot", async () => 
   state.error = "Offline";
   mount();
   expect(screen.getByRole("alert").textContent).toContain("Spaces could not be loaded");
-  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   expect(state.load).toHaveBeenCalledWith({ force: true });
 });

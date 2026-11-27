@@ -21,9 +21,11 @@ import { useConversationTurnActions } from "./use_conversation_turn_actions";
 const conversation = {
   id: "chat",
   messages: [
-    { id: "u1", role: "user", mode: "ask", content: "Fix it", createdAt: "" },
+    { id: "u1", role: "user", mode: "ask", content: "Make a plan", createdAt: "" },
+    { id: "a1", role: "assistant", mode: "ask", content: "Plan", createdAt: "" },
+    { id: "u2", role: "user", mode: "ask", content: "Fix it", createdAt: "" },
     {
-      id: "a1",
+      id: "a2",
       role: "assistant",
       mode: "ask",
       content: "Done",
@@ -58,11 +60,11 @@ afterEach(() => {
   store.working = false;
 });
 
-describe("retrying past turns that changed files", () => {
+describe("resuming a task list past turns that changed files", () => {
   it("sends nothing and keeps the chat when the person cancels", async () => {
     files.plan.mockResolvedValue(plan);
     const { send, view } = setup();
-    act(() => view.result.current.retryPrompt("Fix it", "u1"));
+    act(() => view.result.current.resumeLedger("a1", []));
     await waitFor(() => expect(view.result.current.filesAsk).toEqual(plan));
     act(() => view.result.current.chooseFiles({ kind: "cancel" }));
     await Promise.resolve();
@@ -73,11 +75,11 @@ describe("retrying past turns that changed files", () => {
     expect(view.result.current.filesAsk).toBeNull();
   });
 
-  it("puts back only the files the person chose, then sends again", async () => {
+  it("puts back only the files the person chose, then resumes", async () => {
     files.plan.mockResolvedValue(plan);
     files.restore.mockResolvedValue({ restored: 1, failed: [] });
     const { send, view } = setup();
-    act(() => view.result.current.retryPrompt("Fix it", "u1"));
+    act(() => view.result.current.resumeLedger("a1", []));
     await waitFor(() => expect(view.result.current.filesAsk).not.toBeNull());
     act(() =>
       view.result.current.chooseFiles({
@@ -85,38 +87,38 @@ describe("retrying past turns that changed files", () => {
         files: [{ folder: "/work", path: "a.ts" }],
       }),
     );
-    await waitFor(() => expect(send).toHaveBeenCalledWith("Fix it", false));
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.any(String), true));
     expect(files.restore).toHaveBeenCalledWith(["run-1"], [{ folder: "/work", path: "a.ts" }]);
-    expect(store.rewindConversation).toHaveBeenCalledWith("chat", "u1");
+    expect(store.rewindConversation).toHaveBeenCalledWith("chat", "u2");
   });
 
   it("can keep the files and still go back", async () => {
     files.plan.mockResolvedValue(plan);
     const { send, view } = setup();
-    act(() => view.result.current.retryPrompt("Fix it", "u1"));
+    act(() => view.result.current.resumeLedger("a1", []));
     await waitFor(() => expect(view.result.current.filesAsk).not.toBeNull());
     act(() => view.result.current.chooseFiles({ kind: "keep" }));
     await waitFor(() => expect(send).toHaveBeenCalled());
     expect(files.restore).not.toHaveBeenCalled();
-    expect(store.rewindConversation).toHaveBeenCalledWith("chat", "u1");
+    expect(store.rewindConversation).toHaveBeenCalledWith("chat", "u2");
   });
 
   it("asks nothing when the removed turns changed no files", async () => {
     files.plan.mockResolvedValue({ incomplete: false, folders: [] });
     const { send, view } = setup();
-    act(() => view.result.current.retryPrompt("Fix it", "u1"));
+    act(() => view.result.current.resumeLedger("a1", []));
     await waitFor(() => expect(send).toHaveBeenCalled());
     expect(view.result.current.filesAsk).toBeNull();
-    expect(store.rewindConversation).toHaveBeenCalledWith("chat", "u1");
+    expect(store.rewindConversation).toHaveBeenCalledWith("chat", "u2");
   });
 
-  it("stops before sending when the files can't be put back", async () => {
+  it("stops before resuming when the files can't be put back", async () => {
     files.plan.mockResolvedValue(plan);
     files.restore.mockRejectedValue(new Error("Misty isn't ready yet."));
     const send = vi.fn();
     const reportError = vi.fn();
     const view = renderHook(() => useConversationTurnActions(conversation, send, reportError));
-    act(() => view.result.current.retryPrompt("Fix it", "u1"));
+    act(() => view.result.current.resumeLedger("a1", []));
     await waitFor(() => expect(view.result.current.filesAsk).not.toBeNull());
     act(() =>
       view.result.current.chooseFiles({

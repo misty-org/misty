@@ -146,8 +146,12 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
   async toggleMute() {
     const muted = !get().muted;
     if (!running?.native || !get().source?.mic) return;
-    await invoke("voice_capture_mute", { muted });
-    set({ muted });
+    try {
+      await invoke("voice_capture_mute", { muted });
+      set({ muted });
+    } catch {
+      set({ notice: muted ? "Couldn't mute the microphone." : "Couldn't unmute the microphone." });
+    }
   },
 
   async stop() {
@@ -155,8 +159,13 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     if (!current || get().phase !== "live") return;
     running = undefined;
     set({ phase: "saving" });
-    await release(current);
-    await current.live.finish();
+    try {
+      await release(current);
+      await current.live.finish();
+    } catch {
+      set({ phase: "idle", notice: "Couldn't finish the recording. Try again." });
+      return;
+    }
     const turns = savedTurns(current.live.transcript.turns());
     const { source, title, speakers } = get();
     if (!turns.length || !source) {

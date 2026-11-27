@@ -1,7 +1,15 @@
 import { ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { openExternalLink } from "@/shared/platform/open_external_link";
-import { Button, MenuItem, notify, ProgressPill, Shelf, ShelfItem } from "@misty/ui";
+import {
+  Button,
+  MenuItem,
+  notify,
+  ProgressPill,
+  StoreList,
+  StoreRow,
+  StoreSection,
+} from "@misty/ui";
 import { confirmAction } from "@/shared/lib/confirm_action";
 import type { EntryOf, ListingEntry, ListingKind, McpEntry, PluginEntry } from "@/native/registry";
 import {
@@ -23,20 +31,14 @@ import { MakerTile, pluginMaker } from "./PluginMaker";
 
 export function ListingLogo({
   entry,
-  size = "tile",
+  size = "item",
 }: {
   entry: ListingEntry;
-  size?: "tile" | "hero";
+  size?: "item" | "sheet";
 }) {
   const link = entry.source ? `https://github.com/${entry.source.repo}` : null;
   const maker = pluginMaker({ author: entry.maker, link });
-  return (
-    <MakerTile
-      maker={maker.brand || !entry.avatar ? maker : { ...maker, avatar: entry.avatar }}
-      name={entry.name}
-      size={size}
-    />
-  );
+  return <MakerTile maker={maker} name={entry.name} size={size} />;
 }
 
 export const sourceLink = (entry: ListingEntry) =>
@@ -66,11 +68,6 @@ export function useListingAction(item: ListingItem): {
       setBusy(false);
     }
   };
-  const manage: BarAction = {
-    label: "Manage",
-    variant: "secondary",
-    onClick: () => nav.manage(item),
-  };
   const get = (onClick: () => void): BarAction => ({
     label: "Get",
     variant: "get",
@@ -79,7 +76,7 @@ export function useListingAction(item: ListingItem): {
   });
   const { entry } = item;
   if (item.kind === "skills") {
-    if (skills.of(entry)) return { action: manage, has: true };
+    if (skills.of(entry)) return { action: null, has: true };
     const targets = engines.flatMap((engine) => (engine.skills ? [engine.skills] : []));
     return {
       has: false,
@@ -105,23 +102,25 @@ export function useListingAction(item: ListingItem): {
     };
   }
   if (item.kind === "templates") {
-    if (agentsFrom(entry).length) return { action: manage, has: true };
     return {
-      has: false,
-      action: get(
-        () =>
+      has: agentsFrom(entry).length > 0,
+      action: {
+        label: "Use",
+        variant: "secondary",
+        disabled: busy,
+        onClick: () =>
           void run(
             () => makeAgentFromTemplate(entry),
             `${entry.name} couldn't be made into an agent.`,
             () => notify({ message: `${entry.name} is one of your agents.` }),
           ),
-      ),
+      },
     };
   }
   if (item.kind === "mcps") {
     const server = item.entry;
     const here = mcp.of(server);
-    if (here.connection || here.configured.length) return { action: manage, has: true };
+    if (here.connection || here.configured.length) return { action: null, has: true };
     if (server.remote)
       return {
         has: false,
@@ -130,7 +129,7 @@ export function useListingAction(item: ListingItem): {
         ),
       };
     if (!runsHere(server)) return { action: null, has: false };
-    if (server.env?.length) return { has: false, action: get(() => nav.manage(item)) };
+    if (server.env?.length) return { has: false, action: get(() => nav.open(item)) };
     const targets = engines.filter((engine) => engine.mcp).map((engine) => engine.id);
     return {
       has: false,
@@ -168,7 +167,7 @@ export function useListingAction(item: ListingItem): {
             ),
         },
       };
-    if (record) return { action: manage, has: true };
+    if (record) return { action: null, has: true };
     if (!plugin.bundle) return { action: null, has: false };
     return {
       has: false,
@@ -191,7 +190,7 @@ export const askToRun = (engine: string, command: string) =>
     `Let ${engine} run this?`,
   );
 
-const actionLabels = ["Get", "Manage", "Update", "Open"];
+const actionLabels = ["Get", "Update", "Open", "Use", "Sign in", "Remove"];
 
 export function ActionButton({
   action,
@@ -228,6 +227,18 @@ export function ActionButton({
   );
 }
 
+export function SourceMenu({ entry }: { entry: ListingEntry }) {
+  const link = sourceLink(entry);
+  if (!link) return null;
+  return (
+    <MenuItem
+      icon={ExternalLink}
+      label="Open its source"
+      onSelect={() => void openExternalLink(link)}
+    />
+  );
+}
+
 export function ListingItem<K extends ListingKind>({
   kind,
   entry,
@@ -238,22 +249,14 @@ export function ListingItem<K extends ListingKind>({
   const nav = useExploreNav();
   const item = { kind, entry } as ListingItem;
   const { action } = useListingAction(item);
-  const link = sourceLink(entry);
   return (
-    <ShelfItem
+    <StoreRow
       logo={<ListingLogo entry={entry} />}
       title={entry.name}
-      line={entry.description || entry.maker}
-      action={<ActionButton action={action} />}
-      menu={
-        link ? (
-          <MenuItem
-            icon={ExternalLink}
-            label="Open its source"
-            onSelect={() => void openExternalLink(link)}
-          />
-        ) : undefined
-      }
+      line={entry.description || undefined}
+      maker={entry.maker}
+      action={<ActionButton action={action} label={entry.name} />}
+      menu={sourceLink(entry) ? <SourceMenu entry={entry} /> : undefined}
       onOpen={() => nav.open(item)}
     />
   );
@@ -272,11 +275,13 @@ export function ListingShelf<K extends ListingKind>({
 }) {
   if (!items.length) return null;
   return (
-    <Shelf title={title} action={onSeeAll ? <SeeAll onClick={onSeeAll} /> : undefined}>
-      {items.map((entry) => (
-        <ListingItem key={entry.id} kind={kind} entry={entry} />
-      ))}
-    </Shelf>
+    <StoreSection title={title} action={onSeeAll ? <SeeAll onClick={onSeeAll} /> : undefined}>
+      <StoreList label={title}>
+        {items.map((entry) => (
+          <ListingItem key={entry.id} kind={kind} entry={entry} />
+        ))}
+      </StoreList>
+    </StoreSection>
   );
 }
 

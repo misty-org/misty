@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { useStableCallback } from "@/shared/hooks/use_stable_callback";
-import { PaneLoading, Text } from "@misty/ui";
+import { PaneLoading, cn, composerDockClass, Text } from "@misty/ui";
 import { useMistyWhileShown } from "../state/use_misty_while_shown";
 import { useCompanionState } from "../../tutor/cursor/companion_state";
 import {
@@ -112,7 +112,7 @@ export function AgentWorkspaceConversation({
   const shownWorking =
     state.working &&
     (!state.invocationConversationId || state.invocationConversationId === conversation?.id);
-  const permission = usePermissionMode(conversation?.id, agent?.default_run_mode);
+  const permission = usePermissionMode(conversation?.id);
   const outsideEngine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
   const { folder } = useChatFolder(conversation?.id);
   const activeConversationId = conversationId ?? state.activeConversationId;
@@ -386,7 +386,7 @@ export function AgentWorkspaceConversation({
         messages={conversation?.messages}
         scrollRef={scrollRef}
       />
-      <div className="agent-compose-area w-full shrink-0 px-4 pb-1">
+      <div className={cn("agent-compose-area", composerDockClass)}>
         <AgentComposeError
           error={state.error}
           reconnect={state.working && Boolean(state.invocationId)}

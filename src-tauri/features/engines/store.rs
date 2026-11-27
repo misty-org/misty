@@ -199,6 +199,34 @@ pub fn forget_chat(store: &Store, account: &str, conversation: &str) -> Result<(
     Ok(())
 }
 
+pub fn drop_chat_folder(
+    store: &Store,
+    account: &str,
+    conversation: &str,
+    kind: &str,
+) -> Result<(), String> {
+    store
+        .connect()
+        .map_err(text)?
+        .execute(
+            "DELETE FROM chat_folders WHERE account = ?1 AND conversation_id = ?2 AND kind = ?3",
+            [account, conversation, kind],
+        )
+        .map(|_| ())
+        .map_err(text)
+}
+
+pub fn scratch_chats(store: &Store) -> Result<Vec<(String, String)>, String> {
+    let connection = store.connect().map_err(text)?;
+    let mut statement = connection
+        .prepare("SELECT account, conversation_id FROM chat_folders WHERE kind = 'scratch'")
+        .map_err(text)?;
+    let rows = statement
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(text)?;
+    rows.collect::<Result<_, _>>().map_err(text)
+}
+
 pub fn all_chat_ids(store: &Store) -> Result<std::collections::HashSet<String>, String> {
     let connection = store.connect().map_err(text)?;
     let mut statement = connection

@@ -41,9 +41,8 @@ type AgentMessageProps = {
   message: GlobalAiMessage;
   steps?: GlobalAiMessage[];
   retryPrompt?: string;
-  retryFrom?: string;
   working: boolean;
-  onRetry: (prompt: string, fromMessageId?: string) => void;
+  onRetry: (prompt: string) => void;
   onResume?: (messageId: string, rows: LedgerRow[], only?: string[]) => void;
   onLedgerChange?: (messageId: string, rows: LedgerRow[]) => void;
   onEdit?: (text: string) => void;
@@ -78,7 +77,11 @@ function AgentMessageView(props: AgentMessageProps) {
     : { answer: visible, remaining: [] };
   const failed =
     ended && !remaining.length && message.state === "failed" ? splitFailure(visible) : undefined;
-  const content = failed ? failed.answer : ended && !remaining.length ? "" : answer;
+  const content = failed
+    ? failed.answer
+    : ended && !remaining.length && message.state !== "canceled"
+      ? ""
+      : answer;
   const failure = failed ? failed.reason : "";
   const live = message.state === "pending" || message.state === "streaming";
   const engineTurn = useEngineTurn(
@@ -142,7 +145,6 @@ function AgentMessageView(props: AgentMessageProps) {
             text={content}
             working={props.working}
             retryPrompt={props.retryPrompt}
-            retryFrom={props.retryFrom}
             onRetry={props.onRetry}
             onReply={props.onReply}
           />
@@ -180,7 +182,6 @@ function AgentMessageView(props: AgentMessageProps) {
             message={message}
             working={props.working}
             retryPrompt={props.retryPrompt}
-            retryFrom={props.retryFrom}
             onRetry={props.onRetry}
           />
         ) : null}
@@ -215,7 +216,6 @@ function AgentMessageView(props: AgentMessageProps) {
             remaining={remaining}
             failure={failure}
             retryPrompt={props.retryPrompt}
-            retryFrom={props.retryFrom}
             working={props.working}
             onRetry={props.onRetry}
             ledger={ledger}

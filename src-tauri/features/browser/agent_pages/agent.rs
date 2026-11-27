@@ -113,6 +113,9 @@ pub(crate) async fn execute_agent_request(
     match request.operation.as_str() {
         "browser.inspect" => inspect_browser(&app, &state, &id, &request).await,
         "browser.visual" => visual_browser(&app, &state, &id, &request).await,
+        "browser.navigate" if request.input.get("history").is_some() => {
+            go_through_history(&app, &state, &id, &request).await
+        }
         "browser.navigate" => {
             let url = request
                 .input
@@ -133,31 +136,16 @@ pub(crate) async fn execute_agent_request(
                 crate::agents::run_control::tool_gate::program_opens(&app, &store, active, url)
                     .await?;
             }
+            let _ = (&view, &previous);
             let snapshot = request.input["includeSnapshot"] != false;
-            let mark = if snapshot {
-                crate::browser::agent_pages::page_agent::mark_document(&app, &id).await
-            } else {
-                None
-            };
-            view.navigate(target.clone())
-                .map_err(|error| error.to_string())?;
-            let mut landed = json!({"ok": true, "url": url});
-            if snapshot {
-                if let Some(snapshot) = crate::browser::agent_pages::page_agent::landed(
-                    &app,
-                    &id,
-                    &previous,
-                    &target,
-                    mark.as_deref(),
-                )
-                .await
-                {
-                    if snapshot["url"].is_string() {
-                        landed["url"] = snapshot["url"].clone();
-                    }
-                    landed["snapshot"] = snapshot;
-                }
-            }
+            let landed = crate::browser::agent_pages::page_agent::navigate(
+                &app,
+                &state,
+                &request,
+                misty_page_runtime::Go::Address(target.as_str()),
+                snapshot,
+            )
+            .await?;
             if let Some(arrived) = landed["url"]
                 .as_str()
                 .and_then(|url| Url::parse(url).ok())
@@ -201,4 +189,30 @@ pub(crate) async fn execute_agent_request(
         }
         _ => Err("Unsupported browser agent operation.".to_owned()),
     }
+}
+
+async fn go_through_history(
+    app: &AppHandle,
+    state: &BrowserSessionState,
+    id: &str,
+    request: &BrowserAgentExecuteRequest,
+) -> Result<Value, String> {
+    let go = request.input["history"]
+        .as_str()
+        .and_then(misty_page_runtime::Go::history)
+        .ok_or("history is back, forward or reload.")?;
+    let view = app
+        .get_webview(&webview_label(id)?)
+        .ok_or_else(|| "Browser tab is not running.".to_owned())?;
+    let previous = view.url().map_err(|error| error.to_string())?;
+    let landed =
+        crate::browser::agent_pages::page_agent::navigate(app, state, request, go, true).await?;
+    if let Some(now) = landed["url"]
+        .as_str()
+        .and_then(|url| Url::parse(url).ok())
+        .filter(|now| now.origin() != previous.origin())
+    {
+        crate::browser::agent_pages::account_sites::gate_person_tab(app, id, request, &now).await?;
+    }
+    Ok(landed)
 }

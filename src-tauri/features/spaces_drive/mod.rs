@@ -81,6 +81,53 @@ pub(crate) fn run_folder(space: &str) -> Option<PathBuf> {
     mounts().get(space).cloned()
 }
 
+static MOUNTS_CHANGED: LazyLock<tokio::sync::watch::Sender<u64>> =
+    LazyLock::new(|| tokio::sync::watch::channel(0).0);
+
+fn mounts_changed() {
+    MOUNTS_CHANGED.send_modify(|turn| *turn = turn.wrapping_add(1));
+}
+
+fn mount_failure(space: &str) -> Option<String> {
+    host()
+        .as_ref()?
+        .failed
+        .get(&SpaceId(space.to_owned()))
+        .cloned()
+}
+
+pub(crate) fn space_name(space: &str) -> Option<String> {
+    drive()
+        .ok()?
+        .mount_of(&SpaceId(space.to_owned()))
+        .map(|mount| mount.name)
+}
+
+pub(crate) async fn wait_mounted(space: &str, most: Duration) -> Result<PathBuf, String> {
+    let mut changes = MOUNTS_CHANGED.subscribe();
+    let waited = tokio::time::timeout(most, async {
+        loop {
+            if let Some(path) = run_folder(space).filter(|_| drive().is_ok()) {
+                return Ok(path);
+            }
+            if let Some(why) = mount_failure(space) {
+                return Err(why);
+            }
+            if changes.changed().await.is_err() {
+                return Err(String::new());
+            }
+        }
+    })
+    .await;
+    match waited {
+        Ok(Ok(path)) => Ok(path),
+        Ok(Err(why)) if !why.is_empty() => Err(format!(
+            "This Space's files aren't on this computer: {why}"
+        )),
+        _ => Err("This Space's files aren't on this computer yet. Try again in a moment.".into()),
+    }
+}
+
 fn folder_name(id: &str) -> Option<&str> {
     let fine = !id.is_empty()
         && id.len() <= 128
@@ -321,6 +368,7 @@ impl Host {
         let _ = leaving;
         mounts().remove(space.as_str());
         self.failed.remove(space);
+        mounts_changed();
     }
 
     fn shutdown(&mut self) {
@@ -391,6 +439,7 @@ pub(crate) fn sync_spaces(
             Ok(face) => face,
             Err(why) => {
                 host.failed.insert(space.clone(), why);
+                mounts_changed();
                 continue;
             }
         };
@@ -408,9 +457,11 @@ pub(crate) fn sync_spaces(
                     file_access::allow_space_drive(&mount.path);
                 }
                 mounts().insert(space.0.clone(), mount.path.clone());
+                mounts_changed();
             }
             Err(error) => {
                 host.failed.insert(space.clone(), error.to_string());
+                mounts_changed();
             }
         }
     }

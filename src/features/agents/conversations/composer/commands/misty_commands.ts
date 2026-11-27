@@ -2,7 +2,7 @@ import { invoke } from "@/native/invoke";
 import { notify } from "@misty/ui";
 import { pickSaveFile } from "@/native/sandbox";
 import { engineModels, modelNamed } from "../../../engines/engines_api";
-import { engineModesFor } from "../../../engines/engine_modes";
+import { engineModesFor, resolveEngineMode } from "../../../engines/engine_modes";
 import { agentAccountId } from "../../../personal/agent_account";
 import { chooseEngineMode } from "../../../plans/permission_mode";
 import { chatUsage, formatCost } from "../../../context-panel/chat_usage";
@@ -186,12 +186,20 @@ export const mistyCommands: readonly MistyCommand[] = [
     on: "all",
     wins: "always",
     run: async (args, scope) => {
-      if (!args) return openControl("mode");
       const modes = await engineModesFor(scope.engine);
+      if (!args) {
+        const names = [...modes.map((item) => item.label), "Default"];
+        return done(
+          `Type /permissions and one of ${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`,
+        );
+      }
       const wanted = args.toLowerCase();
-      const mode = modes.find(
-        (item) => item.id.toLowerCase() === wanted || item.label.toLowerCase() === wanted,
-      );
+      const mode =
+        wanted === "default"
+          ? resolveEngineMode(modes, "")
+          : modes.find(
+              (item) => item.id.toLowerCase() === wanted || item.label.toLowerCase() === wanted,
+            );
       if (!mode) return done(`This engine has no mode called “${args}”`);
       await chooseEngineMode(scope.conversationId, mode);
       return done(`The next message runs in ${mode.label}`);

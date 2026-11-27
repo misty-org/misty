@@ -1,4 +1,4 @@
-import { recognizeAudio, savedInputDevice } from "@/features/voice";
+import { recognizeAudio, useSavedInputDevice } from "@/features/voice";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { microphoneSettingsHint } from "@/shared/platform/desktop_os";
@@ -23,7 +23,7 @@ export function useAiVoiceRecorder({
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [inputDevices, setInputDevices] = useState<AiVoiceInputDevice[]>([]);
-  const selectedInputDeviceId = savedInputDevice((state) => state.value);
+  const selectedInputDeviceId = useSavedInputDevice((state) => state.value);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -196,7 +196,7 @@ export function useAiVoiceRecorder({
 }
 
 function saveInputDevice(deviceId: string): void {
-  savedInputDevice.getState().set(deviceId);
+  useSavedInputDevice.getState().set(deviceId);
 }
 
 function preferredRecordingMimeType(): string | undefined {

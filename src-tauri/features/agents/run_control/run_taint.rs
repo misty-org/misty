@@ -33,6 +33,11 @@ pub(crate) fn reads_page(name: &str) -> bool {
     matches!(
         name,
         "browser.snapshot"
+            | "browser.console"
+            | "browser.network"
+            | "browser.storage"
+            | "browser.verify"
+            | "browser.page_tools"
             | "browser.find"
             | "browser.extract"
             | "browser.inspect"

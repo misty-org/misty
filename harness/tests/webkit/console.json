@@ -1,0 +1,122 @@
+{
+  "page": "console.html",
+  "run": [
+    {
+      "name": "the page reads",
+      "op": "snapshot",
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "console messages from the load, info and up",
+      "op": "console",
+      "args": {
+        "since": 0
+      },
+      "expect": {
+        "ok": true,
+        "watched": true,
+        "messages": [
+          {
+            "level": "info",
+            "text": "page started"
+          },
+          {
+            "level": "warning",
+            "text": "deprecated option used"
+          },
+          {
+            "level": "error",
+            "text": "~Failed to load img"
+          }
+        ]
+      }
+    },
+    {
+      "name": "errors only",
+      "op": "console",
+      "args": {
+        "since": 0,
+        "level": "error"
+      },
+      "expect": {
+        "messages": [
+          {
+            "level": "error",
+            "text": "~missing.png"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a quiet step brings no console",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click",
+            "ref": "e2"
+          }
+        ]
+      },
+      "expect": {
+        "ran": 1,
+        "steps": [
+          {
+            "ok": true
+          }
+        ],
+        "console": null
+      }
+    },
+    {
+      "name": "a step that breaks the page says so",
+      "op": "steps",
+      "input": {
+        "steps": [
+          {
+            "action": "click",
+            "ref": "e1"
+          }
+        ]
+      },
+      "expect": {
+        "ran": 1,
+        "console": [
+          {
+            "level": "error",
+            "text": "~Request failed: {\"status\":500}"
+          },
+          {
+            "level": "error",
+            "text": "~undefinedFunction"
+          }
+        ]
+      }
+    },
+    {
+      "name": "clearing empties the list",
+      "op": "consoleClear",
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "nothing left after clearing",
+      "op": "console",
+      "args": {
+        "since": 0,
+        "level": "debug"
+      },
+      "expect": {
+        "messages": []
+      }
+    },
+    {
+      "name": "the runtime was sent once for this page",
+      "op": "installs",
+      "expect": 1
+    }
+  ]
+}

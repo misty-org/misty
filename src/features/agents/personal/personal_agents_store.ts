@@ -20,6 +20,12 @@ interface PersonalAgentsState {
 }
 let revision = 0;
 
+function keepIfSame(previous: AgentProfile[], next: AgentProfile[]): AgentProfile[] {
+  return previous.length === next.length && JSON.stringify(previous) === JSON.stringify(next)
+    ? previous
+    : next;
+}
+
 async function signedInStarter(fresh: AgentProfile[]): Promise<AgentProfile | undefined> {
   const answers = await Promise.all(
     fresh.map((agent) =>
@@ -51,7 +57,7 @@ export const usePersonalAgentsStore = create<PersonalAgentsState>((set, get) => 
     try {
       const { agents } = await personalAgentsApi.list(showSaved);
       if (revision === request && get().accountId === accountId) {
-        set({ agents, loading: false, error: "" });
+        set({ agents: keepIfSame(get().agents, agents), loading: false, error: "" });
         const fresh = newEngineAgents;
         if (!get().selected.global && fresh.length) {
           void signedInStarter(fresh).then((starter) => {
@@ -89,7 +95,9 @@ if (typeof window !== "undefined")
     void refreshSpaceAgents(accountId, spaceId)
       .then((agents) => {
         if (agents && usePersonalAgentsStore.getState().accountId === accountId)
-          usePersonalAgentsStore.setState({ agents });
+          usePersonalAgentsStore.setState({
+            agents: keepIfSame(usePersonalAgentsStore.getState().agents, agents),
+          });
       })
       .catch(() => undefined);
   });

@@ -52,7 +52,11 @@ vi.mock("../agents_runtime", async (original) => ({
 vi.mock("../personal/personal_agents_store", () => ({
   defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
     agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
-  usePersonalAgentsStore: () => ({
+  usePersonalAgentsStore: Object.assign(personalAgentsState, { getState: personalAgentsState }),
+}));
+
+function personalAgentsState() {
+  return {
     agents: [
       fixture.agent,
       ...(fixture.includeSecond ? [{ ...fixture.agent, id: "research", name: "Research" }] : []),
@@ -60,8 +64,8 @@ vi.mock("../personal/personal_agents_store", () => ({
     loading: false,
     error: "",
     load: fixture.load,
-  }),
-}));
+  };
+}
 vi.mock("@/features/agents/personal/personal_agents_api", () => ({
   personalAgentsApi: {
     save: fixture.save,

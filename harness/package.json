@@ -4,9 +4,11 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:webkit": "cargo build --locked -p misty_harness_host && for scenario in tests/webkit/*.json; do echo \"== native $scenario\" && ./target/debug/harness-host --scenario \"$scenario\" || exit 1; echo \"== script $scenario\" && MISTY_HARNESS_SCRIPT_INPUT=1 ./target/debug/harness-host --scenario \"$scenario\" || exit 1; done"
   },
   "devDependencies": {
+    "esbuild": "^0.28.1",
     "jsdom": "^29.1.1",
     "typescript": "5.9.3",
     "vitest": "^4.1.11"

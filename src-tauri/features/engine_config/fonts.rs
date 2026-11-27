@@ -66,8 +66,19 @@ fn looks_like_font(bytes: &[u8]) -> bool {
         .any(|magic| bytes.starts_with(&magic[..]))
 }
 
+#[cfg(test)]
 fn adopt_font_file(source: &Path, role: &str) -> Result<PathBuf, String> {
-    read_font_file(source)?;
+    let bytes = file_access::fs::read(source).map_err(|_| "font.err.read_failed".to_string())?;
+    adopt_font_bytes(source, &bytes, role)
+}
+
+fn adopt_font_bytes(source: &Path, bytes: &[u8], role: &str) -> Result<PathBuf, String> {
+    if bytes.len() as u64 > MAX_FONT_BYTES {
+        return Err("font.err.too_large".to_string());
+    }
+    if !looks_like_font(bytes) {
+        return Err("font.err.unsupported".to_string());
+    }
     let extension = source
         .extension()
         .and_then(|ext| ext.to_str())
@@ -85,7 +96,7 @@ fn adopt_font_file(source: &Path, role: &str) -> Result<PathBuf, String> {
         }
     }
     let target = dir.join(format!("{role}.{extension}"));
-    file_access::fs::copy(source, &target).map_err(|_| "font.err.read_failed".to_string())?;
+    file_access::fs::write(&target, bytes).map_err(|_| "font.err.read_failed".to_string())?;
     Ok(target)
 }
 
@@ -139,28 +150,17 @@ pub async fn engine_fonts_set(preferences: FontPreferences) -> Result<FontPrefer
 
 #[tauri::command]
 pub async fn engine_fonts_pick(
-    app: tauri::AppHandle,
+    webview: tauri::Webview,
     role: String,
-) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
+    path: String,
+) -> Result<String, String> {
+    crate::project::person_window(&webview)?;
     let role = normalize_role(&role)?;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title("Choose a font file")
-        .add_filter("Font files", &FONT_EXTENSIONS)
-        .pick_file(move |file| {
-            let _ = send.send(file);
-        });
-    let Some(file) = receive.await.ok().flatten() else {
-        return Ok(None);
-    };
-    let path: PathBuf = file
-        .into_path()
-        .map_err(|_| "Choose a font on this computer.".to_string())?;
-    file_access::allow_picked_file(&path, file_access::Access::Read);
+    let source = crate::files::asked_path(&path)?;
     blocking(move || {
-        adopt_font_file(&path, role).map(|target| Some(target.to_string_lossy().into_owned()))
+        let bytes = crate::files::info::read_picked(&source)
+            .map_err(|_| "font.err.read_failed".to_string())?;
+        adopt_font_bytes(&source, &bytes, role).map(|target| target.to_string_lossy().into_owned())
     })
     .await
 }

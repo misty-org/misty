@@ -93,5 +93,5 @@ export function resolveEngineMode(
   const value = saved?.trim() ?? "";
   const named = modes.find((mode) => mode.id === value);
   if (named) return named;
-  return closest(modes, legacyKind(value) ?? "asks");
+  return closest(modes, legacyKind(value) ?? "no_asking");
 }

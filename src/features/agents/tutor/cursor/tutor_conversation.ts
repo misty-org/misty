@@ -5,6 +5,8 @@ import type {
 import { localChats } from "../../conversations/state/local_chats";
 import { newLocalConversation } from "../../conversations/state/local_conversation";
 import { useMistyStore } from "../../conversations/state/use_misty_store";
+import { homeSpaceOf } from "../../personal/agent_home_space";
+import { cursorAgent } from "./cursor_agent";
 
 export const tutorKeepMs = 24 * 60 * 60 * 1000;
 
@@ -13,11 +15,13 @@ const kept = (message: GlobalAiMessage, now: number) =>
 
 export function tutorConversationOf(
   conversations: GlobalAiConversation[],
+  agentId: string | undefined = cursorAgent()?.id,
 ): GlobalAiConversation | undefined {
   let found: GlobalAiConversation | undefined;
   for (const conversation of conversations)
     if (
       conversation.place === "tutor" &&
+      (conversation.agentId || undefined) === agentId &&
       !conversation.archivedAt &&
       (!found || conversation.updatedAt > found.updatedAt)
     )
@@ -55,7 +59,16 @@ export async function tutorConversation(): Promise<string> {
     throw new Error("Voice session canceled.");
   const made = tutorConversationOf(useMistyStore.getState().conversations);
   if (made && !stale(made)) return made.id;
-  const conversation = newLocalConversation("Tutor", undefined, undefined, "tutor");
+  const agent = cursorAgent();
+  const day = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+    new Date(),
+  );
+  const conversation = newLocalConversation(
+    agent ? `On screen, ${day}` : "Tutor",
+    agent ? homeSpaceOf(state.accountId, agent) || undefined : undefined,
+    agent?.id,
+    "tutor",
+  );
   useMistyStore.setState((current) => ({
     conversations: [conversation, ...current.conversations.filter((c) => c.id !== conversation.id)],
   }));

@@ -245,11 +245,11 @@ export function applyGlobalInvocationEvent(
   }
   if (event.type === "invocation.failed" || event.type === "invocation.canceled") {
     replaceActiveGlobalInvocationStream();
-    const content =
-      event.type === "invocation.failed" ? event.error : "This Misty answer was canceled.";
+    flushStreamedText();
     const current = get()
       .conversations.find((conversation) => conversation.id === conversationId)
       ?.messages.find((message) => message.id === messageId);
+    const content = event.type === "invocation.failed" ? event.error : (current?.content ?? "");
     patchConversationMessage(set, get, conversationId, messageId, {
       content,
       progress: settleProgress(current?.progress),

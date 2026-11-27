@@ -32,7 +32,6 @@ import { disposeWorkspaceTab, workspaceTabsById } from "./workspace_view_lifecyc
 import { Surface } from "@misty/ui";
 import { SidebarAccountBar } from "./SidebarAccountBar";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
-import { SpaceRailNav } from "./SpaceRailNav";
 
 export function WorkspaceCanvas(props: {
   tabPosition?: TabSide;
@@ -42,6 +41,8 @@ export function WorkspaceCanvas(props: {
   const location = useLocation();
   const navigate = useNavigate();
   const layout = useWorkspaceStore((state) => state.layout);
+  const asides = useWorkspaceStore((state) => state.asides);
+  const away = useMemo(() => Object.values(asides ?? {}).map((aside) => aside.layout), [asides]);
   const lastUsedTabByGroup = useWorkspaceStore((state) => state.lastUsedViewByGroup);
   const focusTab = useWorkspaceStore((state) => state.focusView);
   const closeTab = useWorkspaceStore((state) => state.closeView);
@@ -180,7 +181,6 @@ export function WorkspaceCanvas(props: {
         <SidebarDrawer
           side={side}
           gridColumn={sidebarColumn}
-          rail={<SpaceRailNav onOpen={openTab} side={side} />}
           footer={
             props.stripAccount ? (
               <SidebarAccountBar side={side} above={<SidebarNowPlaying onOpen={openTab} />}>
@@ -198,7 +198,12 @@ export function WorkspaceCanvas(props: {
           onOpen={openTab}
           onClosed={navigateToActiveLayoutTab}
         />
-        <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
+        <WorkspaceTabPanels
+          gridColumn={contentColumn}
+          layout={layout}
+          away={away}
+          renderTree={dockTree}
+        />
         <PaneSwapMode />
         <WorkspaceSearch onOpen={openTab} path={location.pathname} />
         <AppBadgeSync />

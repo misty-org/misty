@@ -29,7 +29,7 @@ export const modernEditor: Extension = [
       ".cm-misty-changes": { minWidth: "calc(var(--spacing) * 1.5)" },
       ".cm-activeLine": { backgroundColor: "transparent" },
       ".cm-cursor, .cm-dropCursor": {
-        borderLeftWidth: "2px",
+        borderLeftWidth: "1px",
         transition: "left 70ms ease-out, top 70ms ease-out",
       },
       ".cm-selectionBackground": { borderRadius: "calc(var(--spacing) * 0.75)" },

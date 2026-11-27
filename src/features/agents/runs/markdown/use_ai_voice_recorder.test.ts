@@ -10,7 +10,7 @@ vi.mock("@/shared/platform/native_invoke", () => ({ invoke: db.invoke }));
 
 vi.mock("@/features/voice", async () => ({
   recognizeAudio,
-  savedInputDevice: (await import("@/features/voice/input_device")).savedInputDevice,
+  useSavedInputDevice: (await import("@/features/voice/input_device")).useSavedInputDevice,
 }));
 
 import { microphoneSettingsHint } from "@/shared/platform/desktop_os";

@@ -68,29 +68,11 @@ pub struct CustomResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub added: Option<CustomProgram>,
 }
-pub(super) async fn pick_program(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    let dialog = app
-        .dialog()
-        .file()
-        .set_title("Choose a program to open folders in");
-    #[cfg(target_os = "macos")]
-    let dialog = dialog.add_filter("Applications", &["app"]);
+pub(super) async fn pick_program(webview: &tauri::Webview) -> Result<Option<PathBuf>, String> {
+    let pick = crate::files::pick::Pick::program("Choose a program to open folders in");
     #[cfg(windows)]
-    let dialog = dialog.add_filter("Programs", &["exe"]);
-    dialog.pick_file(move |file| {
-        let _ = send.send(file);
-    });
-    let Some(file) = receive
-        .await
-        .map_err(|_| "No program was chosen.".to_string())?
-    else {
-        return Ok(None);
-    };
-    file.into_path()
-        .map(Some)
-        .map_err(|_| "Choose a program on this computer.".to_string())
+    let pick = pick.accept(&["exe"]);
+    crate::files::pick::pick_one(webview, pick).await
 }
 
 pub(super) fn program_name(path: &Path) -> String {

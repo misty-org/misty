@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { createDeviceSetting } from "@/shared/lib/device_setting";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { savedInputDevice } from "@/features/voice";
+import { useSavedInputDevice } from "@/features/voice";
 import { microphoneSettingsHint } from "@/shared/platform/desktop_os";
 
 export type CallDeviceKind = "audioinput" | "audiooutput" | "videoinput";
 
 const normalize = (stored: unknown) => (typeof stored === "string" ? stored.trim() : "");
 
-export const savedSpeaker = createDeviceSetting<string>({
+export const useSavedSpeaker = createDeviceSetting<string>({
   scope: "call-audio-output-device",
   defaults: "",
   normalize,
@@ -26,7 +26,7 @@ export interface CallAudio {
   deafened: boolean;
 }
 
-export const savedCallAudio = createDeviceSetting<CallAudio>({
+export const useSavedCallAudio = createDeviceSetting<CallAudio>({
   scope: "call-audio-state",
   defaults: { muted: false, deafened: false },
   normalize: (stored) => {
@@ -36,7 +36,7 @@ export const savedCallAudio = createDeviceSetting<CallAudio>({
 });
 
 export async function rememberSpeaker(deviceId: string) {
-  savedSpeaker.getState().set(deviceId);
+  useSavedSpeaker.getState().set(deviceId);
   let label = "";
   try {
     const found = (await navigator.mediaDevices?.enumerateDevices?.()) ?? [];
@@ -59,16 +59,16 @@ export function watchSpeakerForSpeech(): () => void {
   });
 }
 
-export const savedCamera = createDeviceSetting<string>({
+export const useSavedCamera = createDeviceSetting<string>({
   scope: "call-video-input-device",
   defaults: "",
   normalize,
 });
 
 export const savedCallDevice = {
-  audioinput: savedInputDevice,
-  audiooutput: savedSpeaker,
-  videoinput: savedCamera,
+  audioinput: useSavedInputDevice,
+  audiooutput: useSavedSpeaker,
+  videoinput: useSavedCamera,
 } as const;
 
 export interface CallDevice {
@@ -142,7 +142,7 @@ export function useCallDevices(kind: CallDeviceKind): CallDevice[] {
   return devices;
 }
 
-export const savedNoiseReduction = createDeviceSetting<boolean>({
+export const useSavedNoiseReduction = createDeviceSetting<boolean>({
   scope: "call-noise-reduction",
   defaults: true,
   normalize: (stored) => stored !== false,

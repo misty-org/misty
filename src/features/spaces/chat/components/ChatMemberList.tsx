@@ -6,14 +6,19 @@ import {
   MemberRow,
   type MemberPresence,
 } from "@misty/ui";
-import { useMistyStore, useStudioAgents } from "@/features/agents";
+import { useMistyStore, usePersonalAgentsStore, useStudioAgents } from "@/features/agents";
 import { useNow } from "@/shared/hooks/use_now";
 import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import type { Space, SpaceMember, SpaceRoleDef } from "../../api/dto/entities";
 import { MemberRolesMenu } from "../../roles/MemberRolesMenu";
 import { loadSpaceMembers } from "../load_space_members";
 import { useSpacesStore } from "../../list/use_spaces_store";
-import { doingLabel, memberAgentsIn, useMemberAgents } from "../../list/member_agents";
+import {
+  doingLabel,
+  memberAgentsIn,
+  useMemberAgents,
+  type MemberAgentStatus,
+} from "../../list/member_agents";
 import { spaceAgentStatuses } from "../../list/SpaceAgentsBroadcast";
 import { memberColor, memberRoles, useSpaceRoles } from "../../roles/use_space_roles";
 import { useMemberPicture } from "../../members/member_pictures";
@@ -21,26 +26,29 @@ import { useAccountPresence } from "@/shared/lib/account_presence";
 import { useVoicePresence } from "../../list/voice_presence";
 import { useSpaceConversations } from "../sidebar/use_space_conversations";
 import { appEntry } from "../../apps/third_party_apps";
-import { ChatAvatar } from "./ChatAvatar";
+import { ChatAgentAvatar, ChatAvatar } from "./ChatAvatar";
 
-interface Row {
-  member: SpaceMember;
+interface RowBase {
+  key: string;
+  name: string;
   presence: MemberPresence;
   line: string;
 }
 
-function agentLine(agent: {
-  name: string;
-  state: string;
-  doing: string;
-  files?: string[];
-  waiting?: number;
-}) {
+type Row =
+  | (RowBase & { kind: "person"; member: SpaceMember })
+  | (RowBase & { kind: "agent"; agentId: string });
+
+const busy: Record<MemberAgentStatus["state"], number> = {
+  working: 3,
+  "needs-you": 2,
+  landing: 1,
+  resting: 0,
+};
+
+function agentLine(agent: MemberAgentStatus) {
   const file = agent.files?.[0]?.split("/").pop();
-  const doing = file
-    ? `editing ${file}`
-    : doingLabel(agent.doing, agent.state as never, agent.waiting);
-  return doing ? `${agent.name} is ${doing.charAt(0).toLowerCase()}${doing.slice(1)}` : agent.name;
+  return file ? `Editing ${file}` : doingLabel(agent.doing, agent.state, agent.waiting);
 }
 
 function topHoisted(member: SpaceMember, roles: SpaceRoleDef[] | undefined) {
@@ -78,6 +86,7 @@ export function ChatMemberList(props: {
   const heard = useMemberAgents((state) => state.bySpace[spaceId]);
   const roles = useSpaceRoles(spaceId);
   const { agents } = useStudioAgents();
+  const profiles = usePersonalAgentsStore((state) => state.agents);
   const agentChats = useMistyStore((state) => state.conversations);
   const mine = useMemo(
     () => spaceAgentStatuses(agents, spaceId, agentChats),
@@ -98,37 +107,48 @@ export function ChatMemberList(props: {
         activity.set(viewer.user_id, `In ${name}`);
       } else if (viewer.place === "lab") activity.set(viewer.user_id, "In the Lab");
     }
-    const working = new Map<string, { state: string; line: string }>();
-    const remember = (userId: string, agent: Parameters<typeof agentLine>[0]) => {
-      if (agent.state === "resting" || working.get(userId)?.state === "working") return;
-      working.set(userId, { state: agent.state, line: agentLine(agent) });
+    const status = new Map<string, MemberAgentStatus>();
+    const remember = (agent: MemberAgentStatus) => {
+      const known = status.get(agent.id);
+      if (!known || busy[agent.state] > busy[known.state]) status.set(agent.id, agent);
     };
-    for (const { userId, agent } of memberAgentsIn(
-      { bySpace: { [spaceId]: heard ?? {} } },
-      spaceId,
-      now,
-    ))
-      remember(userId, agent);
-    if (props.currentUserId) for (const agent of mine) remember(props.currentUserId, agent);
-    const rows: (Row & { working: boolean })[] = (people ?? [])
+    for (const { agent } of memberAgentsIn({ bySpace: { [spaceId]: heard ?? {} } }, spaceId, now))
+      remember(agent);
+    for (const agent of mine) remember(agent);
+    const spaceAgents = new Map<string, string>();
+    for (const agent of profiles)
+      if (agent.space_id === spaceId && agent.enabled && !agent.system_managed)
+        spaceAgents.set(agent.id, agent.name);
+    const personRows: Row[] = (people ?? [])
       .filter((member) => !props.visibleTo || props.visibleTo(member))
       .map((member) => {
-        const agent = working.get(member.user_id);
         const account = accounts[member.user_id];
-        const presence: MemberPresence = agent
-          ? agent.state === "needs-you"
-            ? "waiting"
-            : "working"
-          : account
-            ? account
-            : here.has(member.user_id)
-              ? "online"
-              : "offline";
-        const line =
-          agent?.line ?? (presence === "offline" ? "" : (activity.get(member.user_id) ?? ""));
-        return { member, presence, line, working: Boolean(agent) };
-      })
-      .sort((left, right) => left.member.name.localeCompare(right.member.name));
+        const presence: MemberPresence = account
+          ? account
+          : here.has(member.user_id)
+            ? "online"
+            : "offline";
+        const line = presence === "offline" ? "" : (activity.get(member.user_id) ?? "");
+        const key = member.user_id;
+        return { kind: "person" as const, key, name: member.name, member, presence, line };
+      });
+    const agentRows: Row[] = [...spaceAgents].map(([agentId, name]) => {
+      const agent = status.get(agentId);
+      const state = agent?.state ?? "resting";
+      const presence: MemberPresence =
+        state === "needs-you" ? "waiting" : state === "resting" ? "online" : "working";
+      return {
+        kind: "agent" as const,
+        key: `agent:${agentId}`,
+        name,
+        agentId,
+        presence,
+        line: agent ? agentLine(agent) : "",
+      };
+    });
+    const rows = [...personRows, ...agentRows].sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
     const out: { title: string; rows: Row[] }[] = [];
     const take = (
       title: string,
@@ -139,17 +159,33 @@ export function ChatMemberList(props: {
       if (picked.length) out.push({ title, rows: picked });
       return pool.filter((item) => !picked.includes(item));
     };
-    let rest = take("Working", (item) => item.working, rows);
+    let rest = rows;
     for (const role of (roles ?? []).filter((item) => item.hoist && !item.is_default))
       rest = take(
         role.name,
-        (item) => item.presence !== "offline" && topHoisted(item.member, roles) === role.id,
+        (item) =>
+          item.kind === "person" &&
+          item.presence !== "offline" &&
+          topHoisted(item.member, roles) === role.id,
         rest,
       );
     rest = take("Online", (item) => item.presence !== "offline", rest);
     take("Offline", () => true, rest);
     return out;
-  }, [heard, people, mine, now, props, roles, spaceId, viewers, accounts, voice, conversations]);
+  }, [
+    heard,
+    people,
+    mine,
+    profiles,
+    now,
+    props,
+    roles,
+    spaceId,
+    viewers,
+    accounts,
+    voice,
+    conversations,
+  ]);
 
   if (!people && failed)
     return (
@@ -170,18 +206,28 @@ export function ChatMemberList(props: {
       {groups.map((group) => (
         <Fragment key={group.title}>
           <MemberGroupHeading title={group.title} count={group.rows.length} />
-          {group.rows.map((item) => (
-            <MemberItem
-              key={item.member.user_id}
-              space={props.space}
-              member={item.member}
-              presence={item.presence}
-              line={item.line}
-              color={memberColor(item.member, roles)}
-              owner={item.member.user_id === props.ownerUserId}
-              isMe={item.member.user_id === props.currentUserId}
-            />
-          ))}
+          {group.rows.map((item) =>
+            item.kind === "agent" ? (
+              <MemberRow
+                key={item.key}
+                avatar={<ChatAgentAvatar agentId={item.agentId} name={item.name} />}
+                name={item.name}
+                presence={item.presence}
+                line={item.line || undefined}
+              />
+            ) : (
+              <MemberItem
+                key={item.key}
+                space={props.space}
+                member={item.member}
+                presence={item.presence}
+                line={item.line}
+                color={memberColor(item.member, roles)}
+                owner={item.member.user_id === props.ownerUserId}
+                isMe={item.member.user_id === props.currentUserId}
+              />
+            ),
+          )}
         </Fragment>
       ))}
     </MemberList>

@@ -1,8 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong): CliEngineSettingsCard.tsx.
 // See NOTICE.
 
-import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
+import { pickPaths } from "@/shared/lib/file_pick";
 import { useState } from "react";
 import {
   DesktopSettingsRow,
@@ -64,8 +64,8 @@ function PathDialog({
     else onClose();
   };
   const choose = async () => {
-    const picked = await open({ directory, multiple: false, title }).catch(() => null);
-    if (typeof picked === "string") setDraft(picked);
+    const [picked] = await pickPaths({ folders: directory, title });
+    if (picked) setDraft(picked);
   };
   return (
     <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>

@@ -15,13 +15,16 @@ fn asks(decision: &Decision) -> bool {
 }
 
 #[test]
-fn the_mode_comes_from_the_saved_request_and_unknown_reads_as_ask() {
+fn the_mode_comes_from_the_saved_request_and_unknown_reads_as_no_asking() {
     let auto = RunFacts::of_request("r", &json!({ "permission_mode": "auto", "prompt": "p" }));
-    assert!(auto.auto);
+    assert!(auto.auto && !auto.bypass);
     assert_eq!(auto.person_prompt, "p");
-    assert!(!RunFacts::of_request("r", &json!({})).auto);
-    assert!(!RunFacts::of_request("r", &json!({ "permission_mode": "AUTO" })).auto);
-    assert!(!RunFacts::of_request("r", &json!(null)).auto);
+    let ask = RunFacts::of_request("r", &json!({ "permission_mode": "ask" }));
+    assert!(!ask.auto && !ask.bypass);
+    for unknown in [json!({}), json!({ "permission_mode": "AUTO" }), json!(null)] {
+        let facts = RunFacts::of_request("r", &unknown);
+        assert!(facts.auto, "{unknown}");
+    }
 }
 
 #[test]
@@ -358,7 +361,10 @@ fn private_addresses_need_the_persons_own_words() {
 
 #[test]
 fn an_engine_opens_pages_freely_in_ask_mode_and_asks_before_acting() {
-    let engine = RunFacts::of_request("r", &json!({ "prompt": "p", "engine": { "id": "claude" } }));
+    let engine = RunFacts::of_request(
+        "r",
+        &json!({ "prompt": "p", "engine": { "id": "claude" }, "permission_mode": "ask" }),
+    );
     assert!(engine.engine && !engine.auto);
     let taint = Taint::default();
     for name in ["browser.navigate", "screen.open"] {

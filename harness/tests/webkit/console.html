@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Console</title>
+<script>
+  console.log("page started");
+  console.warn("deprecated option used");
+</script>
+</head>
+<body>
+  <h1>Console</h1>
+  <img src="/missing.png" alt="Missing picture">
+  <button id="break" onclick="console.error('Request failed:', {status: 500}); undefinedFunction();">Break it</button>
+  <button id="quiet" onclick="document.getElementById('out').textContent = 'fine'">Do nothing wrong</button>
+  <p id="out">idle</p>
+</body>
+</html>

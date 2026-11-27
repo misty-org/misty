@@ -85,6 +85,9 @@ pub fn close_browser_webview(
         let _ = popup_window.destroy();
     }
     forget_shortcut_token(&state, &request.id);
+    if let Ok(label) = webview_label(&request.id) {
+        crate::browser::pages::emulated_size::forget(&label);
+    }
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };

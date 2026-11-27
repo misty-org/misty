@@ -22,6 +22,24 @@ const nodeShims: Record<string, string> = {
   string_decoder: "other",
 };
 
+function sharedUiDependencies(): string[] {
+  const ui = resolve(process.cwd(), "node_modules/@misty/ui");
+  const read = (path: string) => JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+  const dependencies = Object.keys(
+    (read(resolve(ui, "package.json")).dependencies ?? {}) as Record<string, string>,
+  );
+  return dependencies
+    .filter((name) => {
+      try {
+        const main = read(resolve(ui, "node_modules", name, "package.json")).main;
+        return !(typeof main === "string" && main.endsWith(".css"));
+      } catch {
+        return false;
+      }
+    })
+    .map((name) => `@misty/ui > ${name}`);
+}
+
 function publicAppEnv(env: NodeJS.ProcessEnv) {
   return Object.fromEntries(
     Object.entries(env)
@@ -99,7 +117,7 @@ export default defineConfig(({ command, mode }) => {
     envDir: false,
     plugins: [
       katexWoff2Only(),
-      react(),
+      react({ babel: { plugins: [["babel-plugin-react-compiler", { target: "19" }]] } }),
       tailwindcss(),
       stripAssetSourceMaps(),
       stopWhenStranded(),
@@ -122,6 +140,7 @@ export default defineConfig(({ command, mode }) => {
     ),
     optimizeDeps: {
       entries: ["index.html"],
+      include: sharedUiDependencies(),
       exclude: ["@silvia-odwyer/photon", "@misty/ui"],
     },
     resolve: {

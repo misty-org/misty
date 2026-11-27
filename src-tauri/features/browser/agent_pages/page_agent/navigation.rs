@@ -27,82 +27,40 @@ pub(in crate::browser) async fn first_load(app: &AppHandle, id: &str) -> bool {
     }
 }
 
-pub(in crate::browser) async fn mark_document(app: &AppHandle, id: &str) -> Option<String> {
-    let view = webview(app, id).ok()?;
-    let token = uuid::Uuid::new_v4().to_string();
-    let marked = call(&view, "mark", json!({ "token": token }), false)
-        .await
-        .ok()?;
-    (marked["ok"] == true).then_some(token)
+pub(in crate::browser) async fn navigate(
+    app: &AppHandle,
+    state: &BrowserSessionState,
+    request: &BrowserAgentExecuteRequest,
+    go: misty_page_runtime::Go<'_>,
+    include_snapshot: bool,
+) -> Result<Value, String> {
+    let (id, _) = resolve_agent_webview(app, state, request)?;
+    let view = webview(app, &id)?;
+    let host = TabHost {
+        app,
+        state,
+        view: &view,
+        request,
+    };
+    misty_page_runtime::navigate(&host, go, include_snapshot).await
 }
 
-pub(in crate::browser) async fn landed(
+pub(in crate::browser) async fn picture(
     app: &AppHandle,
-    id: &str,
-    previous: &url::Url,
-    target: &url::Url,
-    mark: Option<&str>,
-) -> Option<Value> {
-    let started = tokio::time::Instant::now();
-    let mut arrived;
-    let mut challenge;
-    loop {
-        tokio::time::sleep(Duration::from_millis(300)).await;
-        let view = webview(app, id).ok()?;
-        let url = view.url().ok();
-        let check = call(&view, "waitCheck", json!({}), false).await.ok();
-        let ready = check.as_ref().is_some_and(|check| check["ready"] == true);
-        challenge = check
-            .as_ref()
-            .is_some_and(|check| check["challenge"] == true);
-        let fragment = previous != target && url.as_ref() == Some(target);
-        arrived = match mark {
-            Some(token) => {
-                fragment
-                    || check
-                        .as_ref()
-                        .is_some_and(|check| check["mark"].as_str() != Some(token))
-            }
-            None => {
-                url.as_ref() != Some(previous)
-                    || (previous == target && started.elapsed() > Duration::from_millis(1200))
-            }
-        };
-        let elapsed = started.elapsed();
-        if (arrived && ready && !(challenge && elapsed < Duration::from_secs(20)))
-            || elapsed > Duration::from_secs(if arrived { 25 } else { 15 })
-        {
-            break;
-        }
-    }
-    let view = webview(app, id).ok()?;
-    let _ = call(
-        &view,
-        "settle",
-        json!({"quietMs": 400, "maxMs": 3000}),
-        false,
-    )
-    .await;
-    let declined = decline_consent(&view).await;
-    let args = json!({"candidateId": uuid::Uuid::new_v4().to_string(), "maxChars": SNAPSHOT_CHARS, "maxRefs": 800});
-    let mut snapshot = call(&view, "snapshot", args, true).await.ok()?;
-    if let Some(label) = declined {
-        snapshot["consentDeclined"] = json!(label);
-    }
-    with_frame_trees(&view, &mut snapshot).await;
-    let note = if !arrived {
-        Some(format!("This tab still shows the page it was on: {target} did not load (the address may not exist, or the site is slow). Check the address, or search for the site to find its real one."))
-    } else if challenge {
-        Some("This site is showing a bot check that did not clear by waiting. Do not try to solve it: try another page of the site, a search result that links into it, or another source.".to_owned())
-    } else {
-        None
+    state: &BrowserSessionState,
+    request: &BrowserAgentExecuteRequest,
+) -> Result<Value, String> {
+    let (id, _) = resolve_agent_webview(app, state, request)?;
+    let view = webview(app, &id)?;
+    let host = TabHost {
+        app,
+        state,
+        view: &view,
+        request,
     };
-    if let (Some(note), Some(tree)) = (note, snapshot["tree"].as_str()) {
-        snapshot["tree"] = json!(format!("- note: {note}\n{tree}"));
+    let mut input = request.input.clone();
+    if input["type"].is_null() {
+        input["type"] = json!("jpeg");
     }
-    (snapshot["ok"] == true).then(|| {
-        json!({"documentId": snapshot["documentId"], "url": snapshot["url"], "title": snapshot["title"],
-            "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"],
-            "consentDeclined": snapshot["consentDeclined"], "loaded": arrived})
-    })
+    misty_page_runtime::picture(&host, &input).await
 }

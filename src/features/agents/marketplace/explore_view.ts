@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext } from "react";
 import type { EntryOf, ListingKind } from "@/native/registry";
 
 export const explorePages = [
@@ -20,6 +20,7 @@ const aliases: Record<string, ExplorePage> = {
   mcp: "mcps",
   connections: "mcps",
   updates: "mine",
+  installed: "mine",
 };
 
 export function pageOf(tab: string | null): ExplorePage {
@@ -38,9 +39,8 @@ export type ExploreItem =
 
 export type ExploreView =
   | { at: "page"; page: ExplorePage }
-  | { at: "search"; query: string }
-  | { at: "list"; kind: ListingKind; category: string | null; query?: string }
-  | { at: "item"; item: ExploreItem };
+  | { at: "search"; query: string; within: ExplorePage }
+  | { at: "list"; kind: ListingKind; category: string | null; query?: string };
 
 export interface BarAction {
   label: string;
@@ -53,15 +53,8 @@ export interface BarAction {
 export interface ExploreNav {
   go(view: ExploreView): void;
   open(item: ExploreItem): void;
-  manage(item: ExploreItem): void;
-  closeManage(): void;
+  close(): void;
   back(): void;
-  setPinned(pinned: boolean): void;
-  setBarAction(
-    action: Omit<BarAction, "onClick"> | null,
-    onClick?: () => void,
-    title?: string,
-  ): void;
 }
 
 export const ExploreNavContext = createContext<ExploreNav | null>(null);
@@ -70,27 +63,6 @@ export function useExploreNav(): ExploreNav {
   const nav = useContext(ExploreNavContext);
   if (!nav) throw new Error("Explore's pages are drawn inside ExplorePage");
   return nav;
-}
-
-export function useBarAction(action: BarAction | null, title?: string) {
-  const { setBarAction } = useExploreNav();
-  const handler = useRef(action?.onClick);
-  handler.current = action?.onClick;
-  const label = action?.label;
-  const variant = action?.variant;
-  const disabled = action?.disabled ?? false;
-  const downloading = Boolean(action?.progress);
-  const value = action?.progress?.value;
-  useEffect(() => {
-    setBarAction(
-      label && variant
-        ? { label, variant, disabled, progress: downloading ? { value } : undefined }
-        : null,
-      () => handler.current?.(),
-      title,
-    );
-  }, [label, variant, disabled, downloading, value, title, setBarAction]);
-  useEffect(() => () => setBarAction(null), [setBarAction]);
 }
 
 export const itemKey = (item: ExploreItem) =>

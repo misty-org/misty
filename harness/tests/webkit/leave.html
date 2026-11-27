@@ -1,0 +1,11 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Draft</title></head>
+<body>
+  <a id="away" href="first.html">Go to the first page</a>
+  <script>
+    window.addEventListener("beforeunload", (event) => {
+      event.preventDefault();
+      event.returnValue = "You have unsaved changes.";
+    });
+  </script>
+</body></html>

@@ -1,0 +1,10 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>First page</title></head>
+<body><h1>First page</h1><a href="second.html">Go to the second page</a>
+<p id="loads"></p>
+<script>
+  const loads = Number(sessionStorage.getItem("firstLoads") || 0) + 1;
+  sessionStorage.setItem("firstLoads", String(loads));
+  document.getElementById("loads").textContent = "loads " + loads;
+</script>
+</body></html>

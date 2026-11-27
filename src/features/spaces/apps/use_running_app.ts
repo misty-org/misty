@@ -13,6 +13,7 @@ import { createScreenTools } from "./app_screen_tools";
 import { offerAppTools } from "./app_tools";
 import { createHostChannel } from "./host_channel";
 import type { Authorize, FrameTarget, HostChannel, HostHandlers } from "./host_channel";
+import type { PageAgentLink } from "./app_page_agent";
 import { HostError } from "./protocol";
 
 export interface AppManifest {
@@ -47,7 +48,7 @@ export interface BundleSource {
   };
 }
 
-export interface AppPageView {
+export interface AppPageView extends PageAgentLink {
   snapshot(): Promise<{ dataUrl: string; width: number; height: number }>;
 }
 
@@ -213,12 +214,13 @@ export function useRunningApp(options: {
             screen,
             frame: () => (element.isConnected ? element : null),
             snapshot: page ? () => page.snapshot() : undefined,
+            page,
           });
           tools = offerAppTools({
             appId,
             session: opened,
             mcp: running.mcp === "frame",
-            adapter: running.mcp === "adapter" ? screen : undefined,
+            page: screen,
             extra: screenTools,
           });
           const offered = tools;

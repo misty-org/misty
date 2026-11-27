@@ -16,6 +16,7 @@ vi.mock("@/native/sandbox", () => ({
 vi.mock("@/shared/lib/confirm_action", () => ({ confirmAction: mocks.confirm }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 
+import { clearCachedResources } from "@/api/cache/cached_resource";
 import { SandboxPermissionsSection } from "./SandboxPermissionsSection";
 
 const rows = (downloads: boolean) => [
@@ -28,7 +29,10 @@ beforeEach(() => {
   mocks.set.mockReset().mockResolvedValue(undefined);
   mocks.confirm.mockReset().mockResolvedValue(true);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  clearCachedResources();
+});
 
 test("a switch turns a permission on", async () => {
   render(<SandboxPermissionsSection />);

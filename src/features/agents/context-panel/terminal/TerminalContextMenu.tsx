@@ -4,10 +4,11 @@ import { ClipboardPaste, Copy, Eraser, FileText, FolderOpen, TextSelect, X } fro
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ContextMenu,
-  MenuItem,
   ContextMenuContent,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  MenuItem,
+  notify,
 } from "@misty/ui";
 import { isMacPlatform, isPathUnder, probePath } from "./links";
 import { openTerminalPath, resolveTerminalPath } from "./open_target";
@@ -64,7 +65,11 @@ export function TerminalContextMenu({
           icon={Copy}
           label="Copy"
           disabled={!selection}
-          onSelect={() => void navigator.clipboard.writeText(selection).catch(() => undefined)}
+          onSelect={() =>
+            void navigator.clipboard
+              .writeText(selection)
+              .catch(() => notify({ message: "Couldn't copy the selection.", tone: "error" }))
+          }
         />
         <MenuItem
           icon={ClipboardPaste}
@@ -79,7 +84,12 @@ export function TerminalContextMenu({
                   live.focus();
                 }
               })
-              .catch(() => undefined)
+              .catch(() =>
+                notify({
+                  message: "Couldn't paste. Misty may not have clipboard access.",
+                  tone: "error",
+                }),
+              )
           }
         />
         <MenuItem icon={TextSelect} label="Select all" onSelect={() => term()?.selectAll()} />
@@ -99,7 +109,12 @@ export function TerminalContextMenu({
               icon={FolderOpen}
               label={revealLabel()}
               disabled={!target}
-              onSelect={() => target && void filesApi.reveal(target.path).catch(() => undefined)}
+              onSelect={() =>
+                target &&
+                void filesApi
+                  .reveal(target.path)
+                  .catch(() => notify({ message: "Couldn't show it.", tone: "error" }))
+              }
             />
           </>
         ) : null}

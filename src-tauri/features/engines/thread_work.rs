@@ -17,6 +17,10 @@ use crate::app::runtime::MistyRuntime;
 mod land;
 pub(crate) use land::land;
 
+#[path = "thread_work_adopt.rs"]
+mod adopt;
+use adopt::adopt_scratch;
+
 const ROOT: &str = "threads";
 const META: &str = ".meta";
 const AGENTS: &str = "Agents";
@@ -467,14 +471,22 @@ pub(crate) fn space_lock(space: &str) -> Arc<tokio::sync::Mutex<()>> {
         .clone()
 }
 
-pub(crate) fn note(workspace: &Path, cwd: &Path, mount: &Path, folder: &str) -> String {
+pub(crate) fn note(
+    space: &str,
+    folder: &str,
+    workspace: &Path,
+    cwd: &Path,
+    mount: &Path,
+) -> String {
+    let shown = folder.trim_start_matches('/').replace('/', " \u{203a} ");
     format!(
-        "# Where you work\nThis thread's folder is {cwd}: your own copy of {folder} in the Space. \
-         Everything you save under {workspace} lands in the Space at the same path when your turn \
-         ends, merged with anyone else's changes, so save your work in this folder. The rest of \
-         the Space is at {mount}: read anything there. To change a file elsewhere in the Space, \
-         copy it from {mount} to the same path under {workspace} and edit the copy there. Never \
-         write into {mount} directly.",
+        "# Where you work\nThis thread's folder is {folder} in the Space \u{201c}{space}\u{201d}. Your \
+         working copy of it is {cwd}: save everything you make there. When your turn ends Misty lands \
+         it in the Space at the same path, merged with anyone else's changes, and the person finds it in \
+         Files under {space} \u{203a} {shown}. When you tell the person where something is, say that, \
+         never a path on this computer. The rest of the Space is at {mount}: read anything there. To \
+         change a file elsewhere in the Space, copy it from {mount} to the same path under {workspace} \
+         and edit the copy there. Never write into {mount} directly.",
         cwd = cwd.display(),
         workspace = workspace.display(),
         mount = mount.display(),
@@ -537,22 +549,20 @@ pub(crate) struct Opened {
     pub note: String,
 }
 
+const MOUNT_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
 pub(crate) async fn open(
     app: &AppHandle,
     db: &Store,
     account: &str,
     conversation: &str,
     place: &Place,
-) -> Result<Option<Opened>, String> {
-    if conversation.is_empty() {
-        return Ok(None);
-    }
-    let Some(mount) = crate::spaces_drive::run_folder(&place.space) else {
-        return Ok(None);
-    };
-    let Ok(drive) = crate::spaces_drive::drive() else {
-        return Ok(None);
-    };
+) -> Result<Opened, String> {
+    super::chat_folder::folder_name(conversation)?;
+    let mount = crate::spaces_drive::wait_mounted(&place.space, MOUNT_WAIT).await?;
+    let drive = crate::spaces_drive::drive()?;
+    let lock = space_lock(&place.space);
+    let held = lock.lock().await;
     let row = {
         let (db, account, conversation, place, drive) = (
             db.clone(),
@@ -573,14 +583,21 @@ pub(crate) async fn open(
                     clashes: Vec::new(),
                     note: String::new(),
                 };
-                save(&db, &account, &conversation, &row)?;
                 let _ = drive.make_folders(&SpaceId(row.space.clone()), &row.folder);
+                save(&db, &account, &conversation, &row)?;
+                if let Err(error) = adopt::move_scratch(&db, &drive, &account, &conversation, &row)
+                {
+                    eprintln!("[threads] moving {conversation}'s scratch folder failed: {error}");
+                }
                 Ok(row)
             }
         })
         .await?
     };
+    drop(held);
     let mount = crate::spaces_drive::run_folder(&row.space).unwrap_or(mount);
+    let space_name =
+        crate::spaces_drive::space_name(&row.space).unwrap_or_else(|| "this Space".into());
     let root = workspace(db, conversation)?;
     let cwd = local_of(&root, &row.folder);
     file_access::fs::create_dir_all(&cwd).map_err(text)?;
@@ -590,11 +607,11 @@ pub(crate) async fn open(
         let _ = file_access::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700));
     }
     begin(app, db, &drive, account, conversation, row.clone(), &root).await?;
-    Ok(Some(Opened {
-        note: note(&root, &cwd, &mount, &row.folder),
+    Ok(Opened {
+        note: note(&space_name, &row.folder, &root, &cwd, &mount),
         cwd,
         workspace: root,
-    }))
+    })
 }
 
 async fn begin(
@@ -673,6 +690,7 @@ pub(crate) fn after_run(app: &AppHandle, account: String, conversation: String) 
 }
 
 pub(crate) fn drive_settled(app: &AppHandle, space: &str) {
+    adopt_scratch(app, space);
     let app = app.clone();
     let space = space.to_string();
     tauri::async_runtime::spawn(async move {

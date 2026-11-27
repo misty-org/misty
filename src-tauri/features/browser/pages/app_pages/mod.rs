@@ -2,9 +2,20 @@ use crate::apps::{bundle, frames, manifest};
 use crate::browser::*;
 use sha2::{Digest, Sha256};
 
+mod agent;
 mod downloads;
 mod navigation;
 mod permissions;
+pub use agent::{
+    __cmd__space_app_page_agent, __cmd__space_app_page_emulate, __cmd__space_app_page_input,
+    __cmd__space_app_page_navigate, __cmd__space_app_page_pdf, __cmd__space_app_page_picture,
+    __cmd__space_app_page_steps, __tauri_command_name_space_app_page_emulate,
+    __tauri_command_name_space_app_page_pdf, space_app_page_emulate, space_app_page_pdf,
+    __tauri_command_name_space_app_page_agent, __tauri_command_name_space_app_page_input,
+    __tauri_command_name_space_app_page_navigate, __tauri_command_name_space_app_page_picture,
+    __tauri_command_name_space_app_page_steps, space_app_page_agent, space_app_page_input,
+    space_app_page_navigate, space_app_page_picture, space_app_page_steps,
+};
 use navigation::{refuse_outside, stays_in_app};
 pub use permissions::{
     __cmd__space_app_page_permission_answer, __cmd__space_apps_forget_permissions,
@@ -292,7 +303,9 @@ pub async fn space_app_page_open(
         &token,
         &shortcuts,
         kiri::channel::sender_script(),
-    ));
+    ))
+    .initialization_script(misty_page_runtime::CONSOLE)
+    .initialization_script(misty_page_runtime::NETWORK);
     #[cfg(windows)]
     let builder = builder.general_autofill_enabled(false);
     let (position, size) = logical_bounds(bounds.x, bounds.y, bounds.width, bounds.height);

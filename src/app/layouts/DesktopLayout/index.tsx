@@ -1,28 +1,22 @@
-import { CursorCompanionController, TutorTraySync } from "@/features/agents";
-import { CapturePanel, DictationController } from "@/features/voice";
-import { CallDock, DirectRoot } from "@/features/direct";
 import { type AppTab } from "@/app/shell";
 import {
   AccountClosingNotice,
   AccountSuspendedNotice,
-  DeviceApprovalDialog,
   ServerAlertsNotice,
   openSignInSheet,
   SignInSheet,
-  SignOutSheet,
   useAuth,
 } from "@/features/account";
 import { blockIfUnsaved } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { useWindowDockingLayout } from "@/features/app-windows";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/use_app_zoom";
-import { cn, Surface } from "@misty/ui";
-import { useEffect, useRef, useState } from "react";
+import { cn, placeChrome, Surface } from "@misty/ui";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { isTopEdgeDragPress } from "./window_chrome_drag";
 import { useDockingTransition } from "./use_docking_transition";
 import { DeferUntilIdle } from "./DeferUntilIdle";
-import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
 import { AppNoticePublisher } from "./RouteNotices";
@@ -32,8 +26,6 @@ import { useDesktopBootstrap } from "./use_desktop_bootstrap";
 import { useDesktopFrameStyle } from "./use_desktop_frame_style";
 import { useDesktopRouteEffects } from "./use_desktop_route_effects";
 import { useDesktopShellStatus } from "./use_desktop_shell_status";
-import { HelpDialog } from "./HelpDialog";
-import { TourHost } from "@/features/onboarding";
 import { useDesktopShortcuts } from "./use_desktop_shortcuts";
 import { useDesktopTitlebarGeometry } from "./use_desktop_titlebar_geometry";
 import { useDesktopWindowChrome } from "./use_desktop_window_chrome";
@@ -46,6 +38,54 @@ import { useSettingsOverlay } from "./use_settings_overlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
 import { useCaptionSlot } from "./use_caption_slot";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
+import { useSidebarPlaceColor } from "./sidebar_place_color";
+import { withWindowChrome } from "./docking_geometry";
+
+const CursorCompanionController = lazy(() =>
+  import("@/features/agents/tutor/cursor/CursorCompanionController").then((module) => ({
+    default: module.CursorCompanionController,
+  })),
+);
+const TutorTraySync = lazy(() =>
+  import("@/features/agents/tutor/cursor/tutor_tray").then((module) => ({
+    default: module.TutorTraySync,
+  })),
+);
+const DictationController = lazy(() =>
+  import("@/features/voice/DictationController").then((module) => ({
+    default: module.DictationController,
+  })),
+);
+const CapturePanel = lazy(() =>
+  import("@/features/voice/capture/CapturePanel").then((module) => ({
+    default: module.CapturePanel,
+  })),
+);
+const CallDock = lazy(() =>
+  import("@/features/direct/calls/CallDock").then((module) => ({ default: module.CallDock })),
+);
+const DirectRoot = lazy(() =>
+  import("@/features/direct/DirectRoot").then((module) => ({ default: module.DirectRoot })),
+);
+const SignOutSheet = lazy(() =>
+  import("@/features/account/sign-in-sheet/SignOutSheet").then((module) => ({
+    default: module.SignOutSheet,
+  })),
+);
+const DeviceApprovalDialog = lazy(() =>
+  import("@/features/account/devices/DeviceApprovalDialog").then((module) => ({
+    default: module.DeviceApprovalDialog,
+  })),
+);
+const TourHost = lazy(() =>
+  import("@/features/onboarding/tours/TourHost").then((module) => ({ default: module.TourHost })),
+);
+const HelpDialog = lazy(() =>
+  import("./HelpDialog").then((module) => ({ default: module.HelpDialog })),
+);
+const DesktopShellOverlays = lazy(() =>
+  import("./DesktopShellOverlays").then((module) => ({ default: module.DesktopShellOverlays })),
+);
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useStrayBrowserPages();
   const { user, refreshUser, sessionExpired } = useAuth();
@@ -113,12 +153,15 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     appZoom,
   });
   useSignedOutWindow(isAuthRoute);
+  const placeColor = useSidebarPlaceColor();
   useOtherWindowsHiddenWhileAddingAccount(
     isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
   const stripAccount = !isAuthRoute ? (
     <>
-      <CallDock />
+      <Suspense fallback={null}>
+        <CallDock />
+      </Suspense>
       <AccountIsland
         open={accountMenuOpen}
         onOpenChange={(open) => {
@@ -157,7 +200,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
               gridTemplateColumns: "minmax(0, 1fr)",
               gridTemplateRows: "calc(var(--spacing) * 9.5) minmax(0, 1fr)",
             }
-          : geometry.frame
+          : withWindowChrome(geometry.frame, placeChrome(placeColor))
       }
       data-misty-desktop-frame
       data-rail-flush={!isAuthRoute && geometry.railFlush ? "true" : undefined}
@@ -225,10 +268,12 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
           )}
           {!isAuthRoute && user?.id ? (
             <DeferUntilIdle>
-              <CursorCompanionController key={user.id} accountId={user.id} />
-              <TutorTraySync />
-              <DictationController key={`dictation-${user.id}`} />
-              <CapturePanel key={`capture-${user.id}`} />
+              <Suspense fallback={null}>
+                <CursorCompanionController key={user.id} accountId={user.id} />
+                <TutorTraySync />
+                <DictationController key={`dictation-${user.id}`} />
+                <CapturePanel key={`capture-${user.id}`} />
+              </Suspense>
             </DeferUntilIdle>
           ) : null}
         </>
@@ -236,21 +281,23 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
       <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
       <SignInSheet />
-      {!isAuthRoute && user ? <SignOutSheet /> : null}
-      {!isAuthRoute && user ? <DeviceApprovalDialog /> : null}
       <AccountSuspendedNotice />
       <AccountClosingNotice />
       {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
-      {!isAuthRoute ? <DirectRoot key={user?.id ?? "signed-out"} accountId={user?.id} /> : null}
-      {!isAuthRoute ? <HelpDialog /> : null}
-      {!isAuthRoute ? <TourHost /> : null}
-      {!isAuthRoute ? (
-        <DesktopShellOverlays
-          settingsOpen={settingsOpen}
-          onCloseSettings={closeSettingsOverlay}
-          userId={user?.id}
-        />
-      ) : null}
+      <Suspense fallback={null}>
+        {!isAuthRoute && user ? <SignOutSheet /> : null}
+        {!isAuthRoute && user ? <DeviceApprovalDialog /> : null}
+        {!isAuthRoute ? <DirectRoot key={user?.id ?? "signed-out"} accountId={user?.id} /> : null}
+        {!isAuthRoute ? <HelpDialog /> : null}
+        {!isAuthRoute ? <TourHost /> : null}
+        {!isAuthRoute ? (
+          <DesktopShellOverlays
+            settingsOpen={settingsOpen}
+            onCloseSettings={closeSettingsOverlay}
+            userId={user?.id}
+          />
+        ) : null}
+      </Suspense>
     </Surface>
   );
 }

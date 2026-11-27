@@ -114,11 +114,11 @@
 
   // detail is the click count a browser reports; button 2 is the right button.
   // `proceed` carries a cancelled pointerdown across calls that split one press; returned for the next.
-  const mouse = (el, point, types, detail = 1, button = 0, proceedFrom = true) => {
+  const mouse = (el, point, types, detail = 1, button = 0, proceedFrom = true, keys = {}) => {
     const view = el.ownerDocument.defaultView;
     const rect = el.getBoundingClientRect();
     const init = { clientX: point?.x ?? rect.left + rect.width / 2, clientY: point?.y ?? rect.top + rect.height / 2,
-      bubbles: true, cancelable: true, composed: true, button };
+      bubbles: true, cancelable: true, composed: true, button, ...keys };
     const pressed = button === 2 ? 2 : 1;
     let proceed = proceedFrom;
     for (const type of types) {
@@ -350,14 +350,16 @@
         // actions.ts, MIT; see NOTICE).
         const count = Math.min(3, Math.max(1, Math.trunc(Number(step.clickCount)) || 1));
         const right = step.button === "right";
+        const held = new Set(step.modifiers || []);
+        const keys = { shiftKey: held.has("Shift"), ctrlKey: held.has("Control"), altKey: held.has("Alt"), metaKey: held.has("Meta") };
         const target = innermost(el, args.point);
         leaveLast(target);
-        mouse(target, args.point, ["pointerover", "pointerenter", "mouseover", "pointermove", "mousemove"]);
+        mouse(target, args.point, ["pointerover", "pointerenter", "mouseover", "pointermove", "mousemove"], 1, 0, true, keys);
         for (let press = 1; press <= count && target.isConnected; press++) {
-          const proceed = mouse(target, args.point, ["pointerdown", "mousedown"], press, right ? 2 : 0);
+          const proceed = mouse(target, args.point, ["pointerdown", "mousedown"], press, right ? 2 : 0, true, keys);
           if (press === 1 && proceed && el.isConnected && typeof el.focus === "function") el.focus({ preventScroll: true });
-          mouse(target, args.point, ["pointerup", "mouseup", right ? "contextmenu" : "click"], press, right ? 2 : 0, proceed);
-          if (press === 2 && !right) mouse(target, args.point, ["dblclick"], 2);
+          mouse(target, args.point, ["pointerup", "mouseup", right ? "contextmenu" : "click"], press, right ? 2 : 0, proceed, keys);
+          if (press === 2 && !right) mouse(target, args.point, ["dblclick"], 2, 0, true, keys);
         }
         return { ok: true, attempted: true, input: "script" };
       }
@@ -386,9 +388,39 @@
         const init = { key, code: step.key.length === 1 ? `Key${step.key.toUpperCase()}` : step.key, keyCode: keyCodes[step.key] ?? step.key.toUpperCase().charCodeAt(0),
           which: keyCodes[step.key] ?? step.key.toUpperCase().charCodeAt(0), bubbles: true, cancelable: true, composed: true,
           shiftKey: mods.has("Shift"), ctrlKey: mods.has("Control"), altKey: mods.has("Alt"), metaKey: mods.has("Meta") };
-        target.dispatchEvent(new view.KeyboardEvent("keydown", init));
-        if (target.isConnected) target.dispatchEvent(new view.KeyboardEvent("keyup", init));
+        if (step.phase !== "up") target.dispatchEvent(new view.KeyboardEvent("keydown", init));
+        if (step.phase !== "down" && target.isConnected) target.dispatchEvent(new view.KeyboardEvent("keyup", init));
         return { ok: true, attempted: true, input: "script" };
+      }
+      case "keys": {
+        const target = el || document.activeElement || document.body;
+        if (el) el.focus();
+        const view = target.ownerDocument.defaultView;
+        const doc = target.ownerDocument;
+        let typed = 0;
+        for (const character of String(step.text ?? "")) {
+          const key = character === "\n" ? "Enter" : character;
+          const init = { key, bubbles: true, cancelable: true, composed: true };
+          const proceed = target.dispatchEvent(new view.KeyboardEvent("keydown", init));
+          if (proceed && key !== "Enter") {
+            target.dispatchEvent(new view.KeyboardEvent("keypress", init));
+            const before = new view.InputEvent("beforeinput", { inputType: "insertText", data: character, bubbles: true, cancelable: true, composed: true });
+            if (target.dispatchEvent(before)) {
+              const field = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+              const inserted = doc.execCommand?.("insertText", false, character);
+              if (!inserted && field) {
+                const start = target.selectionStart ?? target.value.length;
+                const end = target.selectionEnd ?? start;
+                target.value = target.value.slice(0, start) + character + target.value.slice(end);
+                target.selectionStart = target.selectionEnd = start + 1;
+                target.dispatchEvent(new view.InputEvent("input", { inputType: "insertText", data: character, bubbles: true, composed: true }));
+              }
+            }
+          }
+          target.dispatchEvent(new view.KeyboardEvent("keyup", init));
+          typed++;
+        }
+        return { ok: true, attempted: true, input: "script", typed };
       }
       case "upload": {
         const view = el?.ownerDocument.defaultView;

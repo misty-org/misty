@@ -1,11 +1,10 @@
 import { Settings } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
   FaceEdit,
-  FileInput,
   IconButton,
   Text,
   Tooltip,
@@ -14,6 +13,7 @@ import {
 import { BannerDialog, useAccountPictureEditor } from "@/features/account";
 import { CallAudioControls } from "@/features/direct";
 import { openSettings, preloadSettingsWorkspace } from "@/features/settings";
+import { pickFile } from "@/shared/lib/file_pick";
 import { PICTURE_TYPES } from "@/shared/lib/square_png";
 import { AccountNavButton } from "./NavRail";
 import { AccountMenu } from "./AccountMenu";
@@ -41,7 +41,6 @@ export function AccountIsland(props: {
   const presence = useMyShownPresence();
   const picture = useAccountPictureEditor();
   const customStatus = useMyCustomStatus();
-  const bannerInput = useRef<HTMLInputElement>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
@@ -101,7 +100,9 @@ export function AccountIsland(props: {
             onOpenAccountSettings={props.onOpenAccountSettings}
             onChangeBanner={() => {
               props.onOpenChange(false);
-              bannerInput.current?.click();
+              void pickFile({ title: "Choose a banner", accept: PICTURE_TYPES }).then(
+                (file) => file && setBannerFile(file),
+              );
             }}
             onChangePicture={() => {
               props.onOpenChange(false);
@@ -114,15 +115,6 @@ export function AccountIsland(props: {
           />
         </DropdownMenu>
       )}
-      <FileInput
-        ref={bannerInput}
-        accept={PICTURE_TYPES}
-        aria-label="Banner"
-        onChange={(event) => {
-          setBannerFile(event.target.files?.[0] ?? null);
-          event.target.value = "";
-        }}
-      />
       <BannerDialog file={bannerFile} onClose={() => setBannerFile(null)} />
       {picture.dialog}
       <CustomStatusDialog open={statusOpen} onOpenChange={setStatusOpen} />

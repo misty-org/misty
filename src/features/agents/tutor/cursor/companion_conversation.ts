@@ -12,6 +12,8 @@ import { heardText, screenNote, stopHearing, turnInput, type HeardTurn } from ".
 import type { DisplayCapture } from "./protocol";
 import { deferred, toRecognizerRate, type SavedVoiceTurn } from "./companion_voice_socket";
 import { voiceRules } from "./companion_voice_rules";
+import { cursorAgent } from "./cursor_agent";
+import { agentVoice } from "../../personal/agent_voice";
 import { handedNote, type HandedFiles } from "./tutor_handed";
 import {
   actOnTags,
@@ -56,6 +58,14 @@ const keptText = (reply: string) =>
     .trim();
 
 export { spokenText } from "./companion_sentences";
+
+function onCursor(conversationId: string) {
+  const agent = cursorAgent();
+  return {
+    run: agent ? { agent: { id: agent.id, engine: agent.engine ?? "" }, conversationId } : {},
+    voice: agentVoice(agent),
+  };
+}
 
 const turnsPerSession = 10;
 
@@ -164,6 +174,7 @@ export class CompanionConversation {
     const ready = warmEngine({
       key: `voice-warm:${session}`,
       session,
+      ...onCursor(this.conversationId).run,
       companion: { companionMode: this.options.companionMode(), displayCaptures: [] },
     }).catch(() => undefined);
     this.warming = { session, ready };
@@ -186,7 +197,8 @@ export class CompanionConversation {
     }
     this.options.onTranscript(id, prompt);
     this.accepted.resolve();
-    const reading = openReading();
+    const cursor = onCursor(this.conversationId);
+    const reading = openReading(cursor.voice);
     const muted = outputMuted();
     let speaking = false;
     const sentences = new SpokenSentences((sentence) => {
@@ -253,6 +265,7 @@ export class CompanionConversation {
     const result = await runOnEngine({
       key: `voice:${this.conversationId}:${id}`,
       session: this.session,
+      ...cursor.run,
       prompt: [
         voiceRules,
         history && !carriesOn

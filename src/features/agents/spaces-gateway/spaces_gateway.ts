@@ -121,7 +121,7 @@ interface SpacesGateway {
   leavePlace(place: PersonPlace["place"], itemId?: string): void;
   NoteBodyEditor: ComponentType<LiveNoteEditorProps>;
   spaceRequest<T = void>(path: string, init?: RequestInit): Promise<T>;
-  pageMisty(spaceId: string, page: "code" | "lab"): Misty;
+  pageMisty(spaceId: string, page: "code" | "lab"): Promise<Misty>;
 }
 
 export const spacesGateway = createPort<SpacesGateway>("Spaces for agents");

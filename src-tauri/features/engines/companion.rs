@@ -34,10 +34,12 @@ pub(super) fn companion_turn(body: &Value, takes_images: bool) -> CompanionTurn 
             images.push(path);
         }
     }
-    CompanionTurn {
-        images,
-        note: Some(agent_runs::companion_engine_note(&named)),
-    }
+    let note = if body["agent"].is_object() && !super::runs::on_cursor(body) {
+        agent_runs::screens_note(&named)
+    } else {
+        Some(agent_runs::companion_engine_note(&named))
+    };
+    CompanionTurn { images, note }
 }
 
 fn save_capture(capture: &Value) -> Option<PathBuf> {
@@ -60,6 +62,12 @@ fn save_capture(capture: &Value) -> Option<PathBuf> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn an_agent_s_turn_gets_its_screenshots_but_not_the_tutor_s_note() {
+        let turn = companion_turn(&json!({ "mode": "companion", "agent": { "name": "Ada" } }), true);
+        assert!(turn.note.is_none());
+    }
 
     #[test]
     fn a_turn_that_is_not_the_companions_gets_nothing() {

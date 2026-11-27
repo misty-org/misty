@@ -1,29 +1,38 @@
 import { RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { updateCli, versionText, type CliVersionStatus } from "@/features/engine-config/clis";
 import { skillsHubApi, type SkillTargetId } from "@/features/engine-config/skills";
 import { useSpeechModels } from "@/features/voice";
 import {
-  AppLogoImage,
   Button,
-  EmptyState,
-  ProgressPill,
   ErrorState,
   notify,
-  Shelf,
-  ShelfItem,
-  ShelfSkeleton,
+  ProgressPill,
+  StoreCard,
+  StoreCards,
+  StoreSection,
+  StoreSkeleton,
+  StoreTiles,
 } from "@misty/ui";
-import type { CatalogEngine } from "./engine_catalog";
+import { type ListingEntry, type PluginEntry } from "@/native/registry";
+import { type CatalogEngine } from "./engine_catalog";
+import { AppItem, AppLogo } from "./ExploreApps";
 import { EngineTile } from "./ExploreEngines";
 import { pillProgress } from "./ExploreSpeechParts";
-import { exploreApps, type ExploreCatalogApp } from "./explore_apps";
+import type { ExploreCatalogApp } from "./explore_apps";
 import { failureText } from "./explore_index";
 import { installPlugin, installSkill, useReadyEngines } from "./explore_installs";
-import { ActionButton, askToRun, ListingLogo } from "./ListingRows";
-import type { PluginEntry } from "@/native/registry";
-import { useBarAction, useExploreNav } from "./explore_view";
+import { useExploreNav } from "./explore_view";
+import { askToRun, ListingLogo } from "./ListingRows";
 import { MakerTile, pluginMaker } from "./PluginMaker";
+import {
+  HeldEngines,
+  HeldSkillsAndPlugins,
+  HeldSpeech,
+  NothingYet,
+  SkillLogo,
+  UsedTemplates,
+} from "./ExploreHeld";
 import {
   appProgress,
   useAppUpdates,
@@ -42,7 +51,7 @@ function engineLine(status: CliVersionStatus) {
   return `From ${from} to ${to}`;
 }
 
-export function MyAppsPage({ spaceId }: { spaceId: string }) {
+export function InstalledPage({ spaceId }: { spaceId: string }) {
   const nav = useExploreNav();
   const { apps, rows: appRows } = useAppUpdates(spaceId);
   const downloads = useDownloads(spaceId);
@@ -152,29 +161,20 @@ export function MyAppsPage({ spaceId }: { spaceId: string }) {
   const speechRows = speech ?? [];
   const count =
     appRows.length + skillRows.length + pluginRows.length + engineRows.length + speechRows.length;
-  useBarAction(
-    count > 1
-      ? {
-          label: "Update all",
-          variant: "get",
-          disabled: busy.size > 0,
-          onClick: () => {
-            for (const { app } of appRows) if (!asksMore(app)) void updateApp(app);
-            for (const skill of skillRows) void updateSkill(skill);
-            for (const plugin of pluginRows) void updatePlugin(plugin);
-            void (async () => {
-              for (const { engine } of engineRows) await updateEngine(engine);
-            })();
-            const packages = new Set<string>();
-            for (const entry of speechRows) {
-              if (packages.has(entry.packageKey)) continue;
-              packages.add(entry.packageKey);
-              void updateSpeech(entry);
-            }
-          },
-        }
-      : null,
-  );
+  const updateAll = () => {
+    for (const { app } of appRows) if (!asksMore(app)) void updateApp(app);
+    for (const skill of skillRows) void updateSkill(skill);
+    for (const plugin of pluginRows) void updatePlugin(plugin);
+    void (async () => {
+      for (const { engine } of engineRows) await updateEngine(engine);
+    })();
+    const packages = new Set<string>();
+    for (const entry of speechRows) {
+      if (packages.has(entry.packageKey)) continue;
+      packages.add(entry.packageKey);
+      void updateSpeech(entry);
+    }
+  };
 
   const loading =
     !apps.loaded ||
@@ -185,7 +185,7 @@ export function MyAppsPage({ spaceId }: { spaceId: string }) {
     return (
       <ErrorState
         inline
-        title="My apps couldn't load"
+        title="Installed couldn't load"
         line={apps.error}
         action={{
           label: "Try again",
@@ -198,29 +198,25 @@ export function MyAppsPage({ spaceId }: { spaceId: string }) {
         }}
       />
     );
-  if (loading && !apps.error && !skills.error) return <ShelfSkeleton label="My apps" items={3} />;
+  if (loading && !apps.error && !skills.error)
+    return (
+      <>
+        <StoreSkeleton label="Installed" look="cards" items={2} />
+        <StoreSkeleton label="Installed" look="tiles" items={4} />
+      </>
+    );
   const downloading = new Set(downloads.apps.map((app) => app.id));
   const updating = new Set(appRows.map(({ app }) => app.id));
   const here = apps.listed.filter(
     (app) =>
       apps.versionOf(app.id) !== undefined && !downloading.has(app.id) && !updating.has(app.id),
   );
-  if (!count && !downloads.apps.length && !downloads.speech.length && !here.length)
-    return <EmptyState inline title="No apps yet" line="What you get in Explore shows up here." />;
-  const appLogo = (app: ExploreCatalogApp) => (
-    <AppLogoImage
-      src={exploreApps().catalogLogoUrl(app)}
-      name={app.name}
-      size="tile"
-      render={app.icon_render}
-    />
-  );
   const updateButton = (
     key: string,
     onClick: () => void,
     progress?: { value?: number },
     name?: string,
-  ) =>
+  ): ReactNode =>
     progress ? (
       <ProgressPill
         value={progress.value}
@@ -242,132 +238,120 @@ export function MyAppsPage({ spaceId }: { spaceId: string }) {
   return (
     <>
       {downloads.apps.length || downloads.speech.length ? (
-        <Shelf title="Downloading">
-          {downloads.apps.map((app) => (
-            <ShelfItem
-              key={`app:${app.id}`}
-              logo={appLogo(app)}
-              title={app.name}
-              line={apps.versionOf(app.id) === undefined ? app.description : `To ${app.version}`}
-              action={
-                <ActionButton
-                  action={{
-                    label: "Get",
-                    variant: "get",
-                    progress: appProgress(apps.downloadOf(app.id)),
-                    onClick: () => undefined,
-                  }}
-                  label={app.name}
-                />
-              }
-              onOpen={() => nav.open({ kind: "apps", id: app.id })}
-            />
-          ))}
-          {downloads.speech.map((entry) => (
-            <ShelfItem
-              key={`speech:${entry.id}`}
-              logo={
-                <MakerTile
-                  maker={pluginMaker({ author: entry.maker, link: entry.source })}
-                  name={entry.name}
-                />
-              }
-              title={entry.name}
-              line={entry.description}
-              action={
-                <ActionButton
-                  action={{
-                    label: "Get",
-                    variant: "get",
-                    progress: pillProgress(downloads.stateOf(entry).coming, true),
-                    onClick: () => undefined,
-                  }}
-                  label={entry.name}
-                />
-              }
-              onOpen={() => nav.open({ kind: "hearing", id: entry.id })}
-            />
-          ))}
-        </Shelf>
+        <StoreSection title="Downloading">
+          <StoreCards label="Downloading">
+            {downloads.apps.map((app) => (
+              <StoreCard
+                key={`app:${app.id}`}
+                logo={<AppLogo app={app} size="item" />}
+                title={app.name}
+                line={apps.versionOf(app.id) === undefined ? "App" : `App, to ${app.version}`}
+                action={
+                  <ProgressPill
+                    value={appProgress(apps.downloadOf(app.id))?.value}
+                    label={`Downloading ${app.name}`}
+                    size="sm"
+                    widthOf={["Get", "Update"]}
+                  />
+                }
+                onOpen={() => nav.open({ kind: "apps", id: app.id })}
+              />
+            ))}
+            {downloads.speech.map((entry) => (
+              <StoreCard
+                key={`speech:${entry.id}`}
+                logo={
+                  <MakerTile
+                    maker={pluginMaker({ author: entry.maker, link: entry.source })}
+                    name={entry.name}
+                  />
+                }
+                title={entry.name}
+                line="Hearing model"
+                action={
+                  <ProgressPill
+                    value={pillProgress(downloads.stateOf(entry).coming, true)?.value}
+                    label={`Downloading ${entry.name}`}
+                    size="sm"
+                    widthOf={["Get", "Update"]}
+                  />
+                }
+                onOpen={() => nav.open({ kind: "hearing", id: entry.id })}
+              />
+            ))}
+          </StoreCards>
+        </StoreSection>
       ) : null}
-      {appRows.length ? (
-        <Shelf title="App updates">
-          {appRows.map(({ app, from }) => (
-            <ShelfItem
-              key={app.id}
-              logo={appLogo(app)}
-              title={app.name}
-              line={`From ${from} to ${app.version}`}
-              action={updateButton(
-                `app:${app.id}`,
-                () => void updateApp(app),
-                appProgress(apps.downloadOf(app.id)),
-                app.name,
-              )}
-            />
-          ))}
-        </Shelf>
-      ) : null}
-      {skillRows.length ? (
-        <Shelf title="Skill updates">
-          {skillRows.map((skill) => (
-            <ShelfItem
-              key={skill.id}
-              logo={
-                <MakerTile
-                  maker={pluginMaker({
-                    link:
-                      skill.repoOwner && skill.repoName
-                        ? `https://github.com/${skill.repoOwner}/${skill.repoName}`
-                        : null,
-                  })}
-                  name={skill.name}
-                />
-              }
-              title={skill.name}
-              line={
-                skill.repoOwner && skill.repoName
-                  ? `From ${skill.repoOwner}/${skill.repoName}`
-                  : skill.description
-              }
-              action={updateButton(`skill:${skill.id}`, () => void updateSkill(skill))}
-            />
-          ))}
-        </Shelf>
-      ) : null}
-      {engineRows.length ? (
-        <Shelf title="Engine updates">
-          {engineRows.map(({ engine, status }) => (
-            <ShelfItem
-              key={engine.id}
-              logo={<EngineTile engine={engine} />}
-              title={engine.name}
-              line={busy.has(`engine:${engine.id}`) ? "Updating" : engineLine(status)}
-              action={updateButton(`engine:${engine.id}`, () => void updateEngine(engine))}
-            />
-          ))}
-        </Shelf>
-      ) : null}
-      {pluginRows.length ? (
-        <Shelf title="Plugin updates">
-          {pluginRows.map((entry) => (
-            <ShelfItem
-              key={entry.id}
-              logo={<ListingLogo entry={entry} />}
-              title={entry.name}
-              line={entry.description}
-              action={updateButton(`plugin:${entry.id}`, () => void updatePlugin(entry))}
-            />
-          ))}
-        </Shelf>
-      ) : null}
-      {speechRows.length ? (
-        <Shelf title="Speech updates">
-          {speechRows.map((entry) => {
-            const coming = speechProgress[entry.id] ?? speechProgress[entry.packageKey];
-            return (
-              <ShelfItem
-                key={entry.id}
+      {count ? (
+        <StoreSection
+          title="Updates"
+          detail={`${count} ready`}
+          action={
+            count > 1 ? (
+              <Button size="sm" disabled={busy.size > 0} onClick={updateAll}>
+                Update all
+              </Button>
+            ) : undefined
+          }
+        >
+          <StoreCards label="Updates">
+            {appRows.map(({ app, from }) => (
+              <StoreCard
+                key={`app:${app.id}`}
+                logo={<AppLogo app={app} size="item" />}
+                title={app.name}
+                line={`From ${from} to ${app.version}`}
+                action={updateButton(
+                  `app:${app.id}`,
+                  () => void updateApp(app),
+                  appProgress(apps.downloadOf(app.id)),
+                  app.name,
+                )}
+                onOpen={() => nav.open({ kind: "apps", id: app.id })}
+              />
+            ))}
+            {engineRows.map(({ engine, status }) => (
+              <StoreCard
+                key={`engine:${engine.id}`}
+                logo={<EngineTile engine={engine} />}
+                title={engine.name}
+                line={busy.has(`engine:${engine.id}`) ? "Updating" : engineLine(status)}
+                state={busy.has(`engine:${engine.id}`) ? "waiting" : undefined}
+                action={updateButton(`engine:${engine.id}`, () => void updateEngine(engine))}
+                onOpen={() => nav.open({ kind: "engines", id: engine.id })}
+              />
+            ))}
+            {skillRows.map((skill) => (
+              <StoreCard
+                key={`skill:${skill.id}`}
+                logo={<SkillLogo skill={skill} />}
+                title={skill.name}
+                line={
+                  skill.repoOwner && skill.repoName
+                    ? `From ${skill.repoOwner}/${skill.repoName}`
+                    : skill.description
+                }
+                action={updateButton(`skill:${skill.id}`, () => void updateSkill(skill))}
+                onOpen={
+                  skill.entry
+                    ? () => nav.open({ kind: "skills", entry: skill.entry as ListingEntry })
+                    : undefined
+                }
+              />
+            ))}
+            {pluginRows.map((entry) => (
+              <StoreCard
+                key={`plugin:${entry.id}`}
+                logo={<ListingLogo entry={entry} />}
+                title={entry.name}
+                line="A newer version"
+                action={updateButton(`plugin:${entry.id}`, () => void updatePlugin(entry))}
+                onOpen={() => nav.open({ kind: "plugins", entry })}
+              />
+            ))}
+            {speechRows.map((entry) => (
+              <StoreCard
+                key={`speech:${entry.id}`}
                 logo={
                   <MakerTile
                     maker={pluginMaker({ author: entry.maker, link: entry.source })}
@@ -379,32 +363,30 @@ export function MyAppsPage({ spaceId }: { spaceId: string }) {
                 action={updateButton(
                   `speech:${entry.id}`,
                   () => void updateSpeech(entry),
-                  pillProgress(coming, false),
+                  pillProgress(speechProgress[entry.id] ?? speechProgress[entry.packageKey], false),
                   entry.name,
                 )}
+                onOpen={() => nav.open({ kind: "hearing", id: entry.id })}
               />
-            );
-          })}
-        </Shelf>
+            ))}
+          </StoreCards>
+        </StoreSection>
       ) : null}
       {here.length ? (
-        <Shelf title="On this computer">
-          {here.map((app) => (
-            <ShelfItem
-              key={app.id}
-              logo={appLogo(app)}
-              title={app.name}
-              line={app.description ?? `By ${app.maker}`}
-              action={
-                <ActionButton
-                  action={{ label: "Open", variant: "secondary", onClick: () => apps.open(app.id) }}
-                  label={app.name}
-                />
-              }
-              onOpen={() => nav.open({ kind: "apps", id: app.id })}
-            />
-          ))}
-        </Shelf>
+        <StoreSection title="Apps" detail="On this computer">
+          <StoreTiles label="Apps on this computer">
+            {here.map((app) => (
+              <AppItem key={app.id} apps={apps} app={app} />
+            ))}
+          </StoreTiles>
+        </StoreSection>
+      ) : null}
+      <UsedTemplates />
+      <HeldSkillsAndPlugins />
+      <HeldEngines />
+      <HeldSpeech />
+      {!count && !downloads.apps.length && !downloads.speech.length && !here.length ? (
+        <NothingYet />
       ) : null}
     </>
   );

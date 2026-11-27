@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, type ComponentType, type ReactNode } from "react";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/session_goals";
@@ -14,9 +7,7 @@ import { useRailShown } from "../context-panel/rail_layout_store";
 import { ChatSessionCard, useAgentChatSidePanel } from "../context-panel/ChatSidePanels";
 import { CHAT_MIN_WIDTH } from "../context-panel/context_panel_store";
 import { isUnread, markConversationRead } from "./conversation_reads";
-import { designPx, FramedPage, Separator, Surface } from "@misty/ui";
-import { AgentMemoryPage } from "../memory/AgentMemoryPage";
-import { homeSpaceOf } from "../personal/agent_home_space";
+import { FramedPage, Separator, Surface } from "@misty/ui";
 import { createPort } from "@/shared/lib/seams";
 
 export const filesPage = createPort<ComponentType>("the Files page");
@@ -28,7 +19,7 @@ function FilesPageSlot() {
 
 const isRunInProgress = (state?: string) => state === "running" || state === "queued";
 
-export type AgentWorkspacePage = "task" | "files" | "memory";
+export type AgentWorkspacePage = "task" | "files";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -63,28 +54,11 @@ export function AgentWorkspaceFrame({
   theirs?: ReactNode;
 }) {
   const chatPageRef = useRef<HTMLDivElement>(null);
-  const frameRef = useRef<HTMLDivElement>(null);
-  const [room, setRoom] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const element = frameRef.current;
-    if (!element) return;
-    const measure = (width: number) => {
-      if (width > 0) setRoom(designPx(width));
-    };
-    measure(element.getBoundingClientRect().width);
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[entries.length - 1];
-      if (entry) measure(entry.contentRect.width);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
   const sidePanel = useAgentChatSidePanel({
     conversationId,
     agent,
+    accountId,
     active: page === "task",
-    room,
   });
   const activeId = page === "task" ? conversationId : undefined;
   let latest: MistyActivityEntry | undefined;
@@ -117,12 +91,11 @@ export function AgentWorkspaceFrame({
       className="agent-studio @container/agent-studio flex h-full min-h-0 min-w-0 flex-1 flex-row"
       data-page={page}
     >
-      <div ref={frameRef} className="flex min-h-0 min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1">
         <FramedPage
           autoSaveId="agent-chat"
           workMinWidth={CHAT_MIN_WIDTH}
           header={page === "task" ? header : undefined}
-          end={theirs ? null : sidePanel}
         >
           <div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden">
             <div
@@ -136,17 +109,8 @@ export function AgentWorkspaceFrame({
             {page === "task" && !theirs ? (
               <ChatSessionCard conversationId={conversationId} agent={agent} />
             ) : null}
+            {page === "task" && !theirs ? sidePanel : null}
             {page === "files" ? <FilesPageSlot /> : null}
-            {page === "memory" ? (
-              <AgentMemoryPage
-                accountId={accountId}
-                agentId={agent.id}
-                agentName={agent.name}
-                engine={agent.engine}
-                conversationId={conversationId}
-                spaceId={agent.system_managed ? undefined : homeSpaceOf(accountId, agent)}
-              />
-            ) : null}
           </div>
         </FramedPage>
       </div>

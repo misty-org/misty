@@ -1,5 +1,4 @@
 import {
-  openDeviceApproval,
   openSignInSheet,
   openSignOutSheet,
   SavedAccountSessionUnavailableError,
@@ -7,13 +6,15 @@ import {
   useAuth,
   useUserStore,
 } from "@/features/account";
-import { useStatusStore } from "@/features/direct";
+import { friendsRoute, useFriends, useStatusStore } from "@/features/direct";
+import { requestOpenRoute } from "@/shared/lib/open_route";
 import { reportSystemError } from "@/shared/platform/system_errors";
 import { isMistyCloud, useServerChoice } from "@/api/deployment/server_choice";
 import { openOnWebsite } from "@/features/account";
 import { routes } from "@/app/shell";
 import { useNativeSessionStore } from "@/features/account";
 import {
+  CountMark,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -25,6 +26,7 @@ import {
   ProfileCardHeader,
   ProfileCardName,
   ProfileCardStatus,
+  spaceIcons,
   Spinner,
   Surface,
   Text,
@@ -35,7 +37,6 @@ import {
   CreditCard,
   LifeBuoy,
   LogOut,
-  MonitorSmartphone,
   Plus,
   Repeat2,
   Settings,
@@ -87,6 +88,7 @@ function AccountMenuItems(props: AccountMenuProps) {
     })),
   );
   const presence = useMyShownPresence();
+  const friendRequests = useFriends().data?.incoming.length ?? 0;
   const status = useStatusStore((state) => state.mine);
   const [switchingAccountId, setSwitchingAccountId] = useState("");
   const account = user ?? currentUser;
@@ -139,11 +141,6 @@ function AccountMenuItems(props: AccountMenuProps) {
     openSignOutSheet();
   };
 
-  const signInDevice = () => {
-    props.onClose();
-    window.setTimeout(() => openDeviceApproval(), 0);
-  };
-
   return (
     <>
       <ProfileCardBanner src={bannerUrl || null} onChange={props.onChangeBanner} />
@@ -168,6 +165,13 @@ function AccountMenuItems(props: AccountMenuProps) {
         }
       />
       <ProfileCardGroup>
+        <MenuItem
+          icon={spaceIcons.friends}
+          label="Friends"
+          shortcut={<ShortcutText commandId="app.open_friends" />}
+          count={<CountMark count={friendRequests} label={`${friendRequests} friend requests`} />}
+          onSelect={() => requestOpenRoute(friendsRoute)}
+        />
         <MenuItem
           icon={<UserCircle />}
           label="Account settings"
@@ -233,12 +237,6 @@ function AccountMenuItems(props: AccountMenuProps) {
             }
           />
         </MenuSubmenu>
-        <MenuItem
-          icon={<MonitorSmartphone />}
-          label="Sign in a device"
-          disabled={transitioning}
-          onSelect={signInDevice}
-        />
         <MenuItem icon={<LogOut />} label="Sign out…" disabled={transitioning} onSelect={signOut} />
       </ProfileCardGroup>
     </>

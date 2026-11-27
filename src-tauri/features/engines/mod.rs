@@ -370,15 +370,60 @@ pub(crate) fn engine_bin(
     }
     resolve::resolve_launchable_cli_binary(cli_binary_name(engine_id))
 }
+type BinaryMark = (u64, Option<std::time::SystemTime>);
+
+static PROBED: std::sync::LazyLock<Mutex<HashMap<String, (BinaryMark, Option<String>)>>> =
+    std::sync::LazyLock::new(Mutex::default);
+
+fn binary_mark(bin: &str) -> Option<BinaryMark> {
+    let path = if Path::new(bin).is_absolute() {
+        PathBuf::from(bin)
+    } else {
+        resolve::find_cli_binary(bin, None)?
+    };
+    let meta = std::fs::metadata(path).ok()?;
+    Some((meta.len(), meta.modified().ok()))
+}
+
+fn probed(bin: &str, mark: Option<BinaryMark>) -> Option<Option<String>> {
+    let mark = mark?;
+    let known = PROBED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    known
+        .get(bin)
+        .filter(|(seen, _)| *seen == mark)
+        .map(|(_, version)| version.clone())
+}
+
 pub async fn list() -> Vec<EngineInfo> {
-    let found = tauri::async_runtime::spawn_blocking(list_engines_blocking)
-        .await
-        .unwrap_or_default();
-    futures_util::future::join_all(found.into_iter().map(|(mut info, bin)| async move {
+    let found = tauri::async_runtime::spawn_blocking(|| {
+        list_engines_blocking()
+            .into_iter()
+            .map(|(info, bin)| {
+                let mark = info.installed.then(|| binary_mark(&bin)).flatten();
+                (info, bin, mark)
+            })
+            .collect::<Vec<_>>()
+    })
+    .await
+    .unwrap_or_default();
+    futures_util::future::join_all(found.into_iter().map(|(mut info, bin, mark)| async move {
         if info.installed {
-            info.version = resolve::version_of(&bin).await;
-            if let Some(engine) = engine_by_id(&info.id) {
-                modes::learn_reported(engine.as_ref(), &bin).await;
+            let engine = engine_by_id(&info.id);
+            if let Some(version) = probed(&bin, mark) {
+                info.version = version;
+            } else {
+                info.version = resolve::version_of(&bin).await;
+                if let Some(engine) = &engine {
+                    modes::learn_reported(engine.as_ref(), &bin).await;
+                }
+                if let Some(mark) = mark {
+                    PROBED
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .insert(bin.clone(), (mark, info.version.clone()));
+                }
+            }
+            if let Some(engine) = &engine {
                 info.modes = modes::named(engine.as_ref());
             }
         }

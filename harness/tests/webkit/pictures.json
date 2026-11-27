@@ -1,0 +1,23 @@
+{
+  "page": "pictures.html",
+  "run": [
+    {"name": "the page reads", "op": "snapshot", "expect": {"tree": "~Badge"}},
+    {"name": "a picture of the view at css scale", "op": "picture", "save": "view",
+     "expect": {"width": 1280, "height": 800, "scale": "css"}},
+    {"name": "the view picture is the page's top", "op": "page", "js": "colorAt($view.dataUrl, 10, 10).then((c) => document.title = c); return true"},
+    {"name": "wait", "op": "wait", "ms": 300},
+    {"name": "it shows red at the top", "op": "page", "js": "return document.title", "expect": "255,0,0 1280x800"},
+    {"name": "a picture of one element", "op": "picture", "input": {"ref": "e1"}, "save": "badge",
+     "expect": {"width": 120, "height": 60, "region": {"x": 100, "y": 100}}},
+    {"name": "the element picture is blue", "op": "page", "js": "colorAt($badge.dataUrl, 5, 5).then((c) => document.title = c); return true"},
+    {"name": "wait", "op": "wait", "ms": 300},
+    {"name": "blue all over", "op": "page", "js": "return document.title", "expect": "0,0,255 120x60"},
+    {"name": "a picture of the full page", "op": "picture", "input": {"fullPage": true}, "save": "full",
+     "expect": {"width": 1280, "height": 2000}},
+    {"name": "read the bottom of the full page", "op": "page", "js": "colorAt($full.dataUrl, 10, 1900).then((c) => document.title = c); return true"},
+    {"name": "wait", "op": "wait", "ms": 300},
+    {"name": "the bottom is green, past the view", "op": "page", "js": "return document.title", "expect": "0,255,0 1280x2000"},
+    {"name": "a device-scale picture is twice as wide", "op": "picture", "input": {"ref": "e1", "scale": "device"},
+     "expect": {"width": 240, "scale": "device"}}
+  ]
+}

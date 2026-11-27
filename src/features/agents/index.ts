@@ -85,6 +85,7 @@ export { spaceAgentsApi, type SpaceAgent } from "./api/space_agents";
 export { copyAgent, removeAgent } from "./personal/save_agent";
 export { spacesGateway } from "./spaces-gateway/spaces_gateway";
 export { findVocative, routeToAgent } from "./tutor/cursor/vocative_route";
+export { showAgentInApp } from "./tutor/cursor/agents_in_apps";
 
 export { openMisty } from "./conversations/ask/handoff";
 export { draftRequestForAgent } from "./conversations/ask/draft_request";

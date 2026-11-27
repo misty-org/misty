@@ -18,7 +18,7 @@ beforeEach(resetDeviceTools);
 
 describe("the run", () => {
   it("covers every device tool", () => {
-    expect(Object.keys(deviceTools)).toHaveLength(25);
+    expect(Object.keys(deviceTools)).toHaveLength(33);
   });
 
   it("refuses a run this computer has no record of, and does nothing", async () => {

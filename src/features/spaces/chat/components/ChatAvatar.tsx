@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage, type AvatarSize } from "@misty/ui";
-import { personTone } from "@/features/agents";
+import { AgentAvatar, personTone, usePersonalAgentsStore } from "@/features/agents";
 import { personInitials } from "@/shared/lib/person_initials";
 
 export function ChatAvatar(props: {
@@ -15,4 +15,12 @@ export function ChatAvatar(props: {
       <AvatarFallback>{personInitials(props.name)}</AvatarFallback>
     </Avatar>
   );
+}
+
+export function ChatAgentAvatar(props: { agentId?: string; name: string; size?: AvatarSize }) {
+  const agent = usePersonalAgentsStore((state) =>
+    props.agentId ? state.agents.find((item) => item.id === props.agentId) : undefined,
+  );
+  if (agent) return <AgentAvatar agent={agent} size={props.size ?? "default"} />;
+  return <ChatAvatar id={props.agentId || props.name} name={props.name} size={props.size} />;
 }

@@ -15,5 +15,6 @@ export {
   useCliStatuses,
   useCliVersionStatus,
 } from "./use_cli_version_status";
-export { versionText } from "./ClisSection";
-export type { CliVersionStatus } from "./api";
+export { uninstallText, versionText } from "./ClisSection";
+export { cliApi } from "./api";
+export type { CliRemoveKind, CliVersionStatus } from "./api";

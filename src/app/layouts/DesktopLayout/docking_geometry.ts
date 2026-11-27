@@ -6,11 +6,11 @@ export const dockingMetrics = {
   titlebar: 38,
   sideTabInset: 0,
   sideTabs: 280,
-  gap: 0,
+  gap: 6,
   tab: 28,
-  edge: 0,
+  edge: 6,
   spaceBar: 36,
-  paneRadius: 0,
+  paneRadius: 12,
 };
 export const dockingMotion = { duration: 300, easing: "ease-in-out" };
 type ShellStyle = CSSProperties & Record<`--${string}`, string | number>;
@@ -42,6 +42,8 @@ export function dockingGeometry({
   };
   frame["--pane-frame"] = remCss(edge);
   frame["--pane-seam-color"] = "transparent";
+  frame["--pane-radius"] = remCss(paneRadius);
+  frame["--pane-edge"] = "var(--color-charcoal-border)";
   for (const side of ["top", "right", "bottom", "left"] as const)
     frame[`--pane-seam-${side}`] = remCss(seams[side]);
   for (const y of ["top", "bottom"] as const)
@@ -50,4 +52,8 @@ export function dockingGeometry({
   const content: CSSProperties = { gridColumn: 2, gridRow: "1 / 4" };
   const railFlush = navigation === "right";
   return { frame, content, railFlush };
+}
+
+export function withWindowChrome(frame: CSSProperties, chrome: string): ShellStyle {
+  return { ...frame, "--misty-window-chrome": chrome };
 }

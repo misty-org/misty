@@ -70,7 +70,7 @@ describe("Space chat display rows", () => {
     expect(markup).toContain("x".repeat(500));
   });
 
-  it("renders managed Misty messages with Agent identity and their mentions", () => {
+  it("renders managed Misty messages as a person's, with no agent tag, and their mentions", () => {
     const misty = message("1", "owner", "2026-08-26T21:37:00.000Z");
     misty.sender_name = "Misty";
     misty.sender_kind = "system";
@@ -79,7 +79,8 @@ describe("Space chat display rows", () => {
 
     const markup = renderMessages([misty]);
 
-    expect(markup).toContain("Agent");
+    expect(markup).toContain('aria-label="Message from Misty"');
+    expect(markup).not.toContain(">Agent<");
     expect(markup).toContain("@Melissa Chen");
   });
 

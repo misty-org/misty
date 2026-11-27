@@ -3,6 +3,7 @@ import { useUserStore } from "@/features/account/core";
 import { createDeviceSetting } from "@/shared/lib/device_setting";
 import { agentAccountId } from "../personal/agent_account";
 import { stopFolderChanges } from "../personal/use_agents_store";
+import { notify } from "@misty/ui";
 
 interface AccountFolders {
   folders: Record<string, string>;
@@ -118,7 +119,9 @@ export const useConversationFolder = create<ConversationFolderState>((set, get) 
   folder: (conversationId) =>
     conversationId ? (get().byConversation[conversationId] ?? null) : get().draft,
   chooseFolder: (conversationId, scopeId) => {
-    void stopFolderChanges(conversationId ?? "draft").catch(() => undefined);
+    void stopFolderChanges(conversationId ?? "draft").catch(() =>
+      notify({ message: "Couldn't turn off changes for the previous folder.", tone: "error" }),
+    );
     get().setFolder(conversationId, scopeId);
   },
   setFolder: (conversationId, scopeId) => {

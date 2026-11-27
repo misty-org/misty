@@ -214,6 +214,13 @@
     consequenceAt: (args) => P.consequenceAt(args), consequenceOfKey: (args) => P.consequenceOfKey(args), describeRef: (args) => P.describeRef(args),
     // page_effects.js
     effectStart: (args) => P.effectStart(args), effectEnd: (args) => P.effectEnd(args), compact: (args) => P.compact(args), signIn: () => P.signIn(),
+    acting: (args) => P.acting(args), armDialog: (args) => P.armDialog(args), dialogSeen: () => P.dialogSeen(),
+    console: (args) => P.console(args), consoleClear: () => P.consoleClear(),
+    network: (args) => P.network(args), networkClear: () => P.networkClear(), networkRequest: (args) => P.networkRequest(args),
+    storage: (args) => P.storage(args),
+    viewInfo: () => P.viewInfo(), pageTools: () => P.pageTools(), pageToolCall: (args) => P.pageToolCall(args), verify: (args) => P.verify(args), highlight: (args) => P.highlight(args), highlightClear: (args) => P.highlightClear(args),
+    pointAt: (args) => P.pointAt(args), pointer: (args) => P.pointer(args), dropFiles: (args) => P.dropFiles(args),
+    region: (args) => P.region(args), scrollToY: (args) => P.scrollToY(args), compose: (args) => P.compose(args),
     locatorFor: (args) => {
       const resolved = P.resolve(args.documentId, args.ref);
       return resolved.ok && resolved.el ? { ok: true, locator: P.locatorOf(resolved.el) } : resolved;

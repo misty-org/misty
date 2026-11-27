@@ -7,9 +7,13 @@ vi.mock("@/features/agents/grants/api", async (original) => ({
 }));
 vi.mock("@/shared/lib/confirm_action", () => ({ confirmAction: vi.fn(async () => true) }));
 import { NoticeViewport } from "@misty/ui";
+import { clearCachedResources } from "@/api/cache/cached_resource";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  clearCachedResources();
+});
 
 const push = {
   id: "grant_1",

@@ -38,7 +38,7 @@
     return "textbox"; // date, time, color and the rest take typed values
   };
 
-  P.role = (el) => {
+  const ownRole = (el) => {
     const explicit = (el.getAttribute("role") || "").trim().split(/\s+/)[0].toLowerCase();
     if (explicit && explicit !== "none" && explicit !== "presentation") return explicit;
     if (explicit === "none" || explicit === "presentation") return "";
@@ -75,6 +75,18 @@
     }
   };
 
+  const NO_ROLE = new Set(["generic", "none", "presentation"]);
+  P.role = (el) => {
+    if (!P.aria?.role) return ownRole(el);
+    try {
+      const role = P.aria.role(el);
+      if (role && !NO_ROLE.has(role)) return role;
+      return el.isContentEditable && el.getAttribute("contenteditable") !== null ? "textbox" : "";
+    } catch {
+      return ownRole(el);
+    }
+  };
+
   P.interactiveRoles = new Set(["link", "button", "checkbox", "radio", "switch", "textbox", "searchbox", "combobox",
     "listbox", "option", "menuitem", "menuitemcheckbox", "menuitemradio", "tab", "slider", "spinbutton", "treeitem", "gridcell", "columnheader"]);
   // Roles whose accessible name comes from their content.
@@ -107,6 +119,17 @@
   };
 
   P.name = (el, role = P.role(el)) => {
+    const inner = (role === "link" || role === "clickable") && el.querySelector(OWN_CONTROLS);
+    if (P.aria?.name && !inner) {
+      try {
+        const name = P.aria.name(el, false);
+        if (name && name.trim()) return clip(name, 160);
+      } catch {}
+    }
+    return ownName(el, role);
+  };
+
+  const ownName = (el, role) => {
     const doc = el.ownerDocument;
     const labelledby = (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean)
       .map((id) => doc.getElementById(id)).filter(Boolean).map((node) => textOf(node, 200)).join(" ");

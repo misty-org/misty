@@ -8,7 +8,7 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
-use tauri::{AppHandle, State, Webview};
+use tauri::{State, Webview};
 
 use crate::agents::shared_folders::check_root;
 use crate::app::runtime::MistyRuntime;
@@ -70,42 +70,21 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-async fn pick_dialog(app: &AppHandle, start: Option<&str>) -> Result<Option<PathBuf>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    let mut dialog = app
-        .dialog()
-        .file()
-        .set_title("Choose a folder to copy into the Space")
-        .set_can_create_directories(false);
+async fn pick_dialog(webview: &Webview, start: Option<&str>) -> Result<Option<PathBuf>, String> {
     let start = start.map(PathBuf::from).filter(|path| path.is_absolute());
-    if let Some(directory) = start.or_else(dirs::document_dir) {
-        dialog = dialog.set_directory(directory);
-    }
-    dialog.pick_folder(move |folder| {
-        let _ = send.send(folder);
-    });
-    let Some(folder) = receive
-        .await
-        .map_err(|_| "No folder was chosen.".to_string())?
-    else {
-        return Ok(None);
-    };
-    folder
-        .into_path()
-        .map(Some)
-        .map_err(|_| "Choose a folder on this computer.".to_string())
+    let pick = crate::files::pick::Pick::folder("Choose a folder to copy into the Space")
+        .start(start.or_else(dirs::document_dir));
+    crate::files::pick::pick_one(webview, pick).await
 }
 
 #[tauri::command]
 pub async fn space_folder_pick(
-    app: AppHandle,
     webview: Webview,
     state: State<'_, MistyRuntime>,
     start: Option<String>,
 ) -> Result<Option<String>, String> {
     person_window(&webview)?;
-    let Some(path) = pick_dialog(&app, start.as_deref()).await? else {
+    let Some(path) = pick_dialog(&webview, start.as_deref()).await? else {
         return Ok(None);
     };
     let protected = [state.environment.misty_dir()];

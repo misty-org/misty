@@ -1,0 +1,12 @@
+{
+  "page": "drop.html",
+  "run": [
+    {"name": "the zone has a ref", "op": "snapshot", "expect": {"tree": "~region \"Drop here\" [ref=e1]"}},
+    {"name": "text dropped", "op": "steps", "input": {"steps": [{"action": "drop", "ref": "e1", "text": "Hello"}]},
+     "expect": {"steps": [{"ok": true, "effect": "page changed"}], "snapshot": {"tree": "~Got Hello | no link"}}},
+    {"name": "a link dropped", "op": "steps", "input": {"steps": [{"action": "drop", "ref": "e1", "url": "https://example.com/a"}]},
+     "expect": {"steps": [{"ok": true}], "snapshot": {"tree": "~Got https://example.com/a | https://example.com/a"}}},
+    {"name": "a drop needs something", "op": "steps", "input": {"steps": [{"action": "drop", "ref": "e1"}]},
+     "expect": {"tool_error": {"message": "~drops text, a url or both"}}}
+  ]
+}

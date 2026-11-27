@@ -5,6 +5,7 @@ import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { SPEECH_CHANGED } from "./speech";
 import { voiceSettings } from "./voice_settings";
+import { notify } from "@misty/ui";
 
 export interface SpeechPackageView {
   url: string;
@@ -162,6 +163,12 @@ export const useSpeechModels = create<SpeechModelsState>((set, get) => ({
     }));
     try {
       await invoke("speech_install", { id });
+      const ready = async () => {
+        await get().load();
+        const model = get().catalog?.hearing.find((item) => item.id === id);
+        notify({ message: `${model?.name ?? "The hearing model"} is ready` });
+      };
+      void ready();
     } catch (error) {
       set((state) => ({
         failures: {

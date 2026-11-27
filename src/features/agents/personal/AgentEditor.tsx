@@ -1,5 +1,4 @@
 import { personalAgentsApi } from "./personal_agents_api";
-import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentEngineField } from "../engines/AgentEngineField";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import { Button, useNotice, Field, Input, Text, Textarea } from "@misty/ui";
@@ -191,13 +190,6 @@ export function AgentEditor({
       </fieldset>
       {profile ? <AgentSpaceField agent={profile} /> : null}
       {profile ? <CopyAgentToSpace agent={profile} /> : null}
-      <span data-tour="agent-permissions" className="contents">
-        <AgentPermissionsField
-          engine={draft.engine}
-          value={draft.default_run_mode ?? "ask"}
-          onChange={(mode) => update("default_run_mode", mode)}
-        />
-      </span>
       <details className="py-1" data-tour="agent-instructions">
         <Text as="summary" bare size="control" tone="muted" className="cursor-pointer">
           Soul and instructions

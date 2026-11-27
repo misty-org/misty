@@ -156,6 +156,7 @@ export interface AiInvocationRequest {
   historyNotes?: unknown;
   companionMode?: "team" | "auto";
   displayCaptures?: DisplayCapture[];
+  cursor?: boolean;
   agentId?: string;
   taskId?: string;
   executionMode?: "user" | "agent";

@@ -1,5 +1,6 @@
 // @vitest-environment-options {"url":"https://docs.google.com/document/d/doc123/edit"}
 import { afterEach, describe, expect, it, vi } from "vitest";
+import roles from "../crates/page-runtime/js/vendor_playwright_roles.js?raw";
 import core from "../crates/page-runtime/js/page_core.js?raw";
 import tree from "../crates/page-runtime/js/page_tree.js?raw";
 import actions from "../crates/page-runtime/js/page_actions.js?raw";
@@ -16,7 +17,8 @@ function load(path: string, html: string): { page: Page; documentId: string } {
   history.replaceState(null, "", path);
   document.body.innerHTML = html;
   delete globals.__mistyAgentPageV1;
-  new Function(`${core}\n${tree}\n${actions}\n${read}\n${skills}`)();
+  new Function(`${roles}
+${core}\n${tree}\n${actions}\n${read}\n${skills}`)();
   const page = globals.__mistyAgentPageV1!;
   const snapshot = page.call("snapshot", { candidateId: "doc-1", maxChars: 20000 });
   return { page, documentId: snapshot.documentId };

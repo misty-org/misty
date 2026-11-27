@@ -9,7 +9,7 @@ import {
 } from "@/features/voice";
 import type { AgentProfile } from "@/shared/schemas";
 import { AgentVoice } from "./agent_voice";
-import { savedCallAudio, savedCallDevice } from "./call_devices";
+import { useSavedCallAudio, savedCallDevice } from "./call_devices";
 import { playCallSound } from "./call_sounds";
 
 export type AgentCallState = "connecting" | "listening" | "thinking" | "speaking" | "working";
@@ -59,9 +59,9 @@ function reasonOf(error: unknown): string {
 export class LocalAgentCall {
   private view: AgentCallView = {
     state: "connecting",
-    micOn: !savedCallAudio.getState().value.muted,
+    micOn: !useSavedCallAudio.getState().value.muted,
     hearing: false,
-    deafened: savedCallAudio.getState().value.deafened,
+    deafened: useSavedCallAudio.getState().value.deafened,
     camera: null,
     screen: null,
   };
@@ -91,7 +91,7 @@ export class LocalAgentCall {
     this.voice = new AgentVoice(null, agent.id, () => this.played());
     this.voice.deafen(this.view.deafened);
     this.unwatch = [
-      savedCallAudio.subscribe((state, previous) => {
+      useSavedCallAudio.subscribe((state, previous) => {
         if (state.value.muted !== previous.value.muted) this.applyMic(!state.value.muted);
         if (state.value.deafened !== previous.value.deafened)
           this.applyDeafen(state.value.deafened);
@@ -136,12 +136,12 @@ export class LocalAgentCall {
 
   toggleMic = () => {
     const muted = this.view.micOn;
-    savedCallAudio.getState().set((current) => ({ ...current, muted }));
+    useSavedCallAudio.getState().set((current) => ({ ...current, muted }));
   };
 
   toggleDeafen = () => {
     const deafened = !this.view.deafened;
-    savedCallAudio.getState().set((current) => ({ ...current, deafened }));
+    useSavedCallAudio.getState().set((current) => ({ ...current, deafened }));
   };
 
   private applyMic(on: boolean) {

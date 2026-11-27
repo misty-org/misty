@@ -6,6 +6,7 @@ import { useMistyStore } from "../conversations/state/use_misty_store";
 import { useChatStatuses } from "../page/use_chat_statuses";
 import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import { aiSurfaceApi } from "../runs/invocations/api";
+import { notify } from "@misty/ui";
 
 export interface TrayChat {
   id: string;
@@ -22,11 +23,20 @@ const LIVE = new Set(["running", "queued", "awaiting_approval", "awaiting_interv
 async function stopAllAgents() {
   const { entries } = await aiSurfaceApi.activity("");
   const runs = entries.filter((entry) => !entry.parent_run_id && LIVE.has(entry.state));
-  await Promise.all(
+  const stopped = await Promise.all(
     runs.map((entry) =>
-      aiSurfaceApi.cancelInvocation(entry.run_id || entry.id).catch(() => undefined),
+      aiSurfaceApi.cancelInvocation(entry.run_id || entry.id).then(
+        () => true,
+        () => false,
+      ),
     ),
   );
+  const failed = stopped.filter((ok) => !ok).length;
+  if (failed) notify({ message: "Some agents couldn't be stopped.", tone: "error" });
+  else if (stopped.length)
+    notify({
+      message: stopped.length === 1 ? "Stopped 1 agent" : `Stopped ${stopped.length} agents`,
+    });
 }
 
 interface TrayActions {
@@ -78,7 +88,13 @@ function useTrayAgents(actions: TrayActions): void {
         latest.current.onOpenChat(payload.agentId, payload.id),
       ),
       current.listen("misty://tray-new-chat", () => latest.current.onNewChat()),
-      current.listen("misty://tray-stop-agents", () => void stopAllAgents().catch(() => undefined)),
+      current.listen(
+        "misty://tray-stop-agents",
+        () =>
+          void stopAllAgents().catch(() =>
+            notify({ message: "Couldn't stop the agents. Try again.", tone: "error" }),
+          ),
+      ),
     ];
     return () => removes.forEach((remove) => void remove.then((stop) => stop()));
   }, [available]);

@@ -23,7 +23,7 @@ const largeChoices = [
   { value: "none", label: "No limit" },
 ];
 
-const savedLargeChoice = createDeviceSetting<string>({
+const useSavedLargeChoice = createDeviceSetting<string>({
   scope: "drive-large-file-choice",
   defaults: "1024",
   normalize: (stored) =>
@@ -32,7 +32,7 @@ const savedLargeChoice = createDeviceSetting<string>({
       : "1024",
 });
 
-const savedCacheChoice = createDeviceSetting<string>({
+const useSavedCacheChoice = createDeviceSetting<string>({
   scope: "drive-cache-choice",
   defaults: "none",
   normalize: (stored) =>
@@ -40,8 +40,8 @@ const savedCacheChoice = createDeviceSetting<string>({
 });
 
 export function DriveSettingsSection(props: SettingsContentProps) {
-  const chosen = savedCacheChoice((state) => state.value);
-  const large = savedLargeChoice((state) => state.value);
+  const chosen = useSavedCacheChoice((state) => state.value);
+  const large = useSavedLargeChoice((state) => state.value);
   const [paused, setPaused] = useState<boolean | null>(null);
   useEffect(() => {
     driveNative
@@ -80,7 +80,7 @@ export function DriveSettingsSection(props: SettingsContentProps) {
             const bytes = value === "none" ? null : Number(value) * MB;
             driveNative
               .setLargeFileLimit(bytes)
-              .then(() => savedLargeChoice.getState().set(value))
+              .then(() => useSavedLargeChoice.getState().set(value))
               .catch(() =>
                 notify({
                   message: "The size couldn't be changed. Try again.",
@@ -102,7 +102,7 @@ export function DriveSettingsSection(props: SettingsContentProps) {
             const bytes = value === "none" ? null : Number(value) * GB;
             driveNative
               .setCacheLimit(bytes)
-              .then(() => savedCacheChoice.getState().set(value))
+              .then(() => useSavedCacheChoice.getState().set(value))
               .catch(() =>
                 notify({
                   message: "The drive's limit couldn't be changed. Try again.",

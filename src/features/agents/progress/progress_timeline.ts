@@ -1,4 +1,5 @@
 import type { AiInvocationEvent, AiProgressItem } from "../runs/invocations/invocation_types";
+import { useRegistry } from "@/native/registry";
 import { companionReply } from "../tutor/cursor/companion_reply";
 
 export type ProgressTool = Extract<AiProgressItem, { type: "tool" }>;
@@ -160,7 +161,95 @@ const verbs: Record<string, [running: string, done: string]> = {
   invite: ["Inviting to", "Invited to"],
   plan: ["Planning", "Planned"],
   fetch: ["Fetching", "Fetched"],
+  run: ["Running", "Ran"],
+  execute: ["Running", "Ran"],
+  insert: ["Inserting", "Inserted"],
+  set: ["Setting", "Set"],
+  change: ["Changing", "Changed"],
+  export: ["Exporting", "Exported"],
+  play: ["Playing", "Played"],
+  pause: ["Pausing", "Paused"],
+  undo: ["Undoing", "Undid"],
+  bake: ["Running", "Ran"],
+  fill: ["Filling in", "Filled in"],
+  recall: ["Recalling", "Recalled"],
+  close: ["Closing", "Closed"],
+  use: ["Using", "Used"],
 };
+
+const screenTools: Record<string, [running: string, done: string]> = {
+  read: ["Reading", "Read"],
+  look: ["Looking at", "Looked at"],
+  click: ["Clicking in", "Clicked in"],
+  hover: ["Pointing in", "Pointed in"],
+  drag: ["Dragging in", "Dragged in"],
+  type: ["Typing in", "Typed in"],
+  fill: ["Filling in fields in", "Filled in fields in"],
+  select: ["Choosing in", "Chose in"],
+  key: ["Pressing keys in", "Pressed keys in"],
+  scroll: ["Scrolling", "Scrolled"],
+  wait: ["Waiting on", "Waited on"],
+  dialog: ["Answering a dialog in", "Answered a dialog in"],
+  upload: ["Handing files to", "Handed files to"],
+  steps: ["Working in", "Worked in"],
+  console: ["Reading the console of", "Read the console of"],
+  history: ["Going back in", "Went back in"],
+};
+
+const serverPrefixes = /^(claude_ai_|plugin_[a-z0-9-]+_)/i;
+
+const plainWords = (text: string) => text.replace(/[_.-]+/g, " ").trim();
+
+function serverName(server: string) {
+  const words = plainWords(server.replace(serverPrefixes, ""));
+  return words.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function appOfWire(rest: string): { name: string; tool: string } | null {
+  const apps = useRegistry.getState().apps as { id?: unknown; name?: unknown }[];
+  let best: { name: string; tool: string; length: number } | null = null;
+  for (const app of apps) {
+    if (typeof app.id !== "string" || typeof app.name !== "string") continue;
+    const wire = `${app.id.replace(/-/g, "_")}_`;
+    if (rest.startsWith(wire) && (!best || wire.length > best.length))
+      best = { name: app.name, tool: rest.slice(wire.length), length: wire.length };
+  }
+  if (best) return { name: best.name, tool: best.tool };
+  const screen = /^(.+?)_(screen_[a-z]+)$/.exec(rest);
+  if (screen) return { name: plainWords(screen[1]), tool: screen[2] };
+  const split = /^([^_]+)_(.+)$/.exec(rest);
+  return split ? { name: plainWords(split[1]), tool: split[2] } : null;
+}
+
+function inPlace(tool: string, place: string, running: boolean, args?: unknown) {
+  const parts = plainWords(tool).split(" ").filter(Boolean);
+  const verbIndex = parts.findIndex((part) => verbs[part]);
+  const command =
+    args && typeof args === "object" && typeof (args as { command?: unknown }).command === "string"
+      ? plainWords((args as { command: string }).command)
+      : "";
+  if (verbIndex < 0)
+    return {
+      verb: running ? "Using" : "Used",
+      subject: `${parts.join(" ") || "a tool"} in ${place}`,
+    };
+  const [ing, ed] = verbs[parts[verbIndex]];
+  const rest = parts.filter((_, index) => index !== verbIndex).join(" ");
+  const what = command || rest;
+  return { verb: running ? ing : ed, subject: what ? `${what} in ${place}` : `in ${place}` };
+}
+
+function mcpParts(server: string, tool: string, running: boolean, args?: unknown) {
+  if (server !== "misty") return inPlace(tool, serverName(server), running, args);
+  const app = tool.startsWith("app_") ? appOfWire(tool.slice(4)) : null;
+  if (app) {
+    const screen = /^screen_([a-z]+)$/.exec(app.tool);
+    const known = screen ? screenTools[screen[1]] : undefined;
+    if (known) return { verb: running ? known[0] : known[1], subject: app.name };
+    return inPlace(app.tool, app.name, running, args);
+  }
+  return null;
+}
 
 const uiSubjects: Record<string, string> = {
   "log.work": "notebook",
@@ -175,6 +264,13 @@ const uiSubjects: Record<string, string> = {
   space: "Spaces",
   agent: "agents",
   device: "signed-in sessions",
+  screen: "a browser tab",
+  "browser.form": "a form",
+  "browser.snapshot": "a page",
+  "browser.steps": "steps on a page",
+  "browser.run": "a program on a page",
+  "browser.visual": "a page's picture",
+  "browser.wait.for": "a page",
 };
 
 const engineTools: Record<string, [running: string, done: string, subject: string]> = {
@@ -203,16 +299,22 @@ const engineTools: Record<string, [running: string, done: string, subject: strin
   task: ["Running", "Ran", "a sub-agent"],
   agent: ["Running", "Ran", "a sub-agent"],
   skill: ["Using", "Used", "a skill"],
+  toolsearch: ["Loading", "Loaded", "tools"],
   exitplanmode: ["Proposing", "Proposed", "a plan"],
 };
 
-export function toolParts(name: string, running: boolean): { verb: string; subject: string } {
+export function toolParts(
+  name: string,
+  running: boolean,
+  args?: unknown,
+): { verb: string; subject: string } {
   const engine = engineTools[name.toLowerCase()];
   if (engine) return { verb: running ? engine[0] : engine[1], subject: engine[2] };
   const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
   if (mcp) {
-    const words = (text: string) => text.replace(/[_-]+/g, " ").trim();
-    return { verb: running ? "Using" : "Used", subject: `${words(mcp[2])} from ${words(mcp[1])}` };
+    const parts = mcpParts(mcp[1], mcp[2], running, args);
+    if (parts) return parts;
+    return toolParts(mcp[2], running, args);
   }
   if (/finish[._]task$|^agent[._]finish$/.test(name))
     return { verb: running ? "Wrapping up" : "Wrapped up", subject: "" };
@@ -237,13 +339,38 @@ export function toolParts(name: string, running: boolean): { verb: string; subje
   };
 }
 
-export function toolLabel(name: string, running: boolean): string {
-  const { verb, subject } = toolParts(name, running);
+export function toolLabel(name: string, running: boolean, args?: unknown): string {
+  const { verb, subject } = toolParts(name, running, args);
   return subject ? `${verb} ${subject}` : verb;
 }
 
+function shortToolName(server: string, tool: string): string {
+  if (server !== "misty") return `${serverName(server)} ${plainWords(tool)}`;
+  const app = tool.startsWith("app_") ? appOfWire(tool.slice(4)) : null;
+  if (app) return `${app.name} ${plainWords(app.tool)}`;
+  return plainWords(tool.replace(/^misty_/, ""));
+}
+
+const plainToolNames = (text: string) =>
+  text.replace(/mcp__([\w.-]+?)__([\w.-]+)/g, (_, server: string, tool: string) =>
+    shortToolName(server, tool),
+  );
+
+function plainDetail(name: string, detail: string): string {
+  if (name.toLowerCase() !== "toolsearch") return plainToolNames(detail);
+  const select = /^select:(.*)$/i.exec(detail.trim());
+  if (!select) return `tools for ${plainToolNames(detail)}`;
+  return select[1]
+    .split(",")
+    .map((each) => plainToolNames(each.trim()))
+    .filter(Boolean)
+    .join(", ");
+}
+
 export function stepTarget(step: ProgressTool): string {
-  return step.activity?.detail || step.path || toolParts(step.name, false).subject;
+  const detail = step.activity?.detail;
+  if (detail) return plainDetail(step.name, detail);
+  return step.path || toolParts(step.name, false, step.args).subject;
 }
 
 export function stepMeta(step: ProgressStep): string {
@@ -266,7 +393,7 @@ export function toolGroupSummary(tools: ProgressTool[]): string {
     const { verb } = toolParts(running.name, false);
     return `${verb} ${stepTarget(running)}`.trim();
   }
-  const labels = [...new Set(tools.map((tool) => toolLabel(tool.name, false)))];
+  const labels = [...new Set(tools.map((tool) => toolLabel(tool.name, false, tool.args)))];
   const shown = labels.slice(0, 3).map((label, index) => (index ? lowerFirst(label) : label));
   const more = labels.length - shown.length;
   return `${shown.join(", ")}${more ? `, and ${more} more` : ""}`;

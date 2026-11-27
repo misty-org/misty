@@ -256,9 +256,18 @@ impl Actor {
         self.shared.published();
         let stored = catalog::stored_event(&catalog.manifest)?;
         let resume = stored.filter(|id| RESUMES && *id <= fs_events::current_id());
+        let progress = if resume.is_none() && RESUMES {
+            catalog::stored_progress(&catalog.manifest)?
+                .filter(|progress| progress.from != 0 && progress.from <= fs_events::current_id())
+        } else {
+            None
+        };
         let start_id = fs_events::current_id();
         self.shared.following.store(true, Ordering::SeqCst);
-        fs_events::follow_index(Some(home.clone()), resume)?;
+        fs_events::follow_index(
+            Some(home.clone()),
+            resume.or(progress.as_ref().map(|progress| progress.from)),
+        )?;
         self.open = Some(Open {
             catalog,
             home,
@@ -266,7 +275,10 @@ impl Actor {
             resumable: resume.is_some(),
         });
         if resume.is_none() {
-            self.full_scan(start_id);
+            match progress {
+                Some(progress) => self.walk_home(progress.from, progress.after),
+                None => self.full_scan(start_id),
+            }
         }
         if disk_allowed() && self.open.is_some() {
             self.shared.set_state(IndexState::Ready);
@@ -275,6 +287,10 @@ impl Actor {
     }
 
     fn full_scan(&mut self, start_id: u64) {
+        self.walk_home(start_id, None);
+    }
+
+    fn walk_home(&mut self, start_id: u64, after: Option<String>) {
         let shared = self.shared.clone();
         let publish = move || shared.published();
         let Some(open) = self.open.as_mut() else {
@@ -283,11 +299,36 @@ impl Actor {
         self.shared.set_state(IndexState::Indexing);
         let _ = catalog::forget_event(&open.catalog.manifest);
         open.resumable = false;
-        match scan::scan(&mut open.catalog, &open.home, &keep_going, &publish) {
+        let checkpoints = RESUMES && start_id != 0;
+        if checkpoints {
+            if let Err(error) =
+                catalog::store_progress(&open.catalog.manifest, start_id, after.as_deref())
+            {
+                eprintln!("{error}");
+            }
+        }
+        let mut part_done = |catalog: &catalog::Catalog, part: &str| {
+            if checkpoints {
+                catalog::store_progress(&catalog.manifest, start_id, Some(part))
+            } else {
+                Ok(())
+            }
+        };
+        match scan::scan(
+            &mut open.catalog,
+            &open.home,
+            after.as_deref(),
+            &keep_going,
+            &publish,
+            &mut part_done,
+        ) {
             Ok(_) => {
                 open.resumable = RESUMES;
-                if RESUMES && start_id != 0 {
+                if checkpoints {
                     if let Err(error) = catalog::store_event(&open.catalog.manifest, start_id) {
+                        eprintln!("{error}");
+                    }
+                    if let Err(error) = catalog::forget_progress(&open.catalog.manifest) {
                         eprintln!("{error}");
                     }
                 }

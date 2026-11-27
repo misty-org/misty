@@ -10,7 +10,7 @@ use tokio::sync::oneshot;
 use crate::agents::run_control::windows::emit_to_account;
 use crate::browser::BrowserAgentExecuteRequest;
 
-pub(in crate::browser) const KINDS: [&str; 4] = ["payment", "send", "delete", "publish"];
+pub(in crate::browser) const KINDS: [&str; 4] = misty_page_runtime::CONSEQUENCE_KINDS;
 
 pub(in crate::browser) fn asks(request: &BrowserAgentExecuteRequest, kind: &str) -> bool {
     kinds_ask(request.policy.confirm_kinds.as_deref(), kind)
@@ -301,12 +301,7 @@ pub fn agent_action_confirm(webview: Webview, id: String, allow: bool) -> Result
 }
 
 pub(in crate::browser) fn label(kind: &str) -> &'static str {
-    match kind {
-        "payment" => "pay or buy",
-        "send" => "send a message",
-        "delete" => "delete something",
-        _ => "post or publish",
-    }
+    misty_page_runtime::consequence_label(kind)
 }
 
 #[cfg(test)]

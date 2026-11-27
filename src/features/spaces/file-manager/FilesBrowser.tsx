@@ -1,11 +1,11 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Dialog, DialogBody, DialogContent, DialogTitle } from "@misty/ui";
 import { FilesFrame } from "./FilesFrame";
 import { FilesPane } from "./FilesPane";
-import type { FileItem, FilesPlace } from "./model";
+import type { FilesPlace } from "./model";
 import { TransfersView } from "./TransfersView";
-import type { FilesPick } from "./files_choices";
+import type { FilesPick, FilesPickFooter } from "./files_choices";
 
 /**
  * Files in one pane: the Files page, or the picker apps open (`pick`, with its `footer` of buttons
@@ -22,8 +22,8 @@ export function FilesBrowser({
   /** Where it opens. */
   start: FilesPlace;
   pick?: FilesPick;
-  /** The picker's buttons, from what is picked now; `open` goes into a folder or picks a file. */
-  footer?: (picked: FileItem[], open: (item: FileItem) => void) => ReactNode;
+  /** The picker's buttons, from what is picked now and where; `open` goes into a folder or picks a file. */
+  footer?: FilesPickFooter;
 }) {
   const [transfers, setTransfers] = useState(false);
   return (

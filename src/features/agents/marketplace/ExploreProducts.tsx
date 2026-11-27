@@ -1,72 +1,77 @@
-import { Cable, ExternalLink, ScrollText, SquareSlash, Users, Webhook } from "lucide-react";
-
-import { openExternalLink } from "@/shared/platform/open_external_link";
-
 import {
+  CatalogNames,
   Mark,
-  MenuItem,
-  ProductInfo,
-  ProductPage,
-  ProductSection,
-  ProductTile,
-  ProductTiles,
   SettingsRow,
   SettingsSection,
+  StoreInfo,
+  StoreSheet,
+  StoreSheetSection,
   Text,
-  type ProductFact,
+  type StoreFact,
 } from "@misty/ui";
-import type { EntryOf, ListingEntry, McpEntry, PluginEntry } from "@/native/registry";
+import type { McpEntry, PluginEntry } from "@/native/registry";
 
-import { AppProduct } from "./ExploreApps";
-import { EngineProduct } from "./ExploreEngines";
-import { SpeechProduct } from "./ExploreSpeechProducts";
+import { AppSheet } from "./ExploreApps";
+import { EngineSheet } from "./ExploreEngines";
+import { SpeechSheet } from "./ExploreSpeechProducts";
 import { useReadyEngines } from "./explore_installs";
-import { kindNames, rankText, sorted, useCategories, useCategoryShard } from "./explore_index";
-import {
-  useBarAction,
-  useExploreNav,
-  type BarAction,
-  type ExploreItem,
-  type ListingItem,
-} from "./explore_view";
+import { kindNames, rankText, useCategories } from "./explore_index";
+import type { ExploreItem, ListingItem } from "./explore_view";
+import { ListingHere } from "./ListingHere";
+import { ActionButton, ListingLogo, SourceMenu, sourceLink, useListingAction } from "./ListingRows";
 
-import {
-  ActionButton,
-  ListingLogo,
-  ListingShelf,
-  sourceLink,
-  useListingAction,
-} from "./ListingRows";
-
-export function ExploreProduct({ item, spaceId }: { item: ExploreItem; spaceId: string }) {
-  if (item.kind === "apps") return <AppProduct spaceId={spaceId} id={item.id} />;
-  if (item.kind === "engines") return <EngineProduct id={item.id} />;
-  if (item.kind === "hearing") return <SpeechProduct id={item.id} />;
-  return <ListingProduct item={item as ListingItem} />;
+export function ExploreSheet({
+  item,
+  spaceId,
+  onClose,
+}: {
+  item: ExploreItem;
+  spaceId: string;
+  onClose: () => void;
+}) {
+  if (item.kind === "apps") return <AppSheet spaceId={spaceId} id={item.id} onClose={onClose} />;
+  if (item.kind === "engines") return <EngineSheet id={item.id} onClose={onClose} />;
+  if (item.kind === "hearing") return <SpeechSheet id={item.id} onClose={onClose} />;
+  return <ListingSheet item={item as ListingItem} onClose={onClose} />;
 }
 
-function ListingProduct({ item }: { item: ListingItem }) {
-  const nav = useExploreNav();
+const kilobytes = (bytes: number) =>
+  bytes >= 1_000_000
+    ? `${(bytes / 1_000_000).toFixed(1).replace(/\.0$/, "")} MB`
+    : `${Math.max(1, Math.round(bytes / 1000))} KB`;
+
+const hostOf = (link: string) => {
+  try {
+    return new URL(link).host;
+  } catch {
+    return link;
+  }
+};
+
+const counted = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+function insideOf(plugin: PluginEntry | null) {
+  const adds = plugin?.includes;
+  if (!adds) return [];
+  return [
+    ...(adds.skills ? [counted(adds.skills, "skill", "skills")] : []),
+    ...(adds.agents ? [counted(adds.agents, "agent", "agents")] : []),
+    ...(adds.commands ? [counted(adds.commands, "command", "commands")] : []),
+    ...(adds.hooks ? ["Hooks"] : []),
+    ...(adds.mcp ? ["1 MCP server"] : []),
+  ];
+}
+
+function ListingSheet({ item, onClose }: { item: ListingItem; onClose: () => void }) {
   const categories = useCategories();
   const { entry, kind } = item;
-  const listed = useListingAction(item);
-  const action: BarAction | null = listed.action;
-  useBarAction(action, entry.name);
-  const shard = useCategoryShard(kind, entry.category);
-  const kin = (shard.data?.items ?? []) as ListingEntry[];
-  const more = sorted(
-    kin.filter((one) => one.maker === entry.maker && one.id !== entry.id),
-    "popular",
-  ).slice(0, 6);
-  const like = sorted(
-    kin.filter((one) => one.maker !== entry.maker),
-    "popular",
-  ).slice(0, 6);
-  const category = categories.find((one) => one.id === entry.category)?.name ?? entry.category;
-  const link = sourceLink(entry);
+  const { action } = useListingAction(item);
   const engines = useReadyEngines();
+  const category = categories.find((one) => one.id === entry.category)?.name ?? entry.category;
   const server = kind === "mcps" ? (entry as McpEntry) : null;
   const plugin = kind === "plugins" ? (entry as PluginEntry) : null;
+  const inside = insideOf(plugin);
   const marks =
     kind === "skills"
       ? engines.filter((engine) => engine.skills)
@@ -75,106 +80,53 @@ function ListingProduct({ item }: { item: ListingItem }) {
         : kind === "plugins"
           ? engines.filter((engine) => engine.plugins || engine.skills)
           : [];
-
-  const facts: ProductFact[] = [
-    ...(entry.rank && entry.source
-      ? [{ label: "Stars", value: rankText(entry.rank), detail: "On GitHub" }]
-      : []),
-    { label: "Category", value: category },
-    { label: "Made by", value: entry.maker },
-    ...(plugin?.includes
-      ? [
-          {
-            label: "Adds",
-            value: String(
-              plugin.includes.skills + plugin.includes.agents + plugin.includes.commands,
-            ),
-            detail: "Skills, agents, commands",
-          },
-        ]
-      : []),
-    ...(server
-      ? [
-          {
-            label: "Connects",
-            value: server.remote ? "Hosted" : "Locally",
-            detail: server.remote ? "You sign in" : "Runs on this computer",
-          },
-        ]
-      : []),
+  const version = server?.package?.version ?? entry.source?.commit.slice(0, 7);
+  const facts: StoreFact[] = [
+    ...(version ? [{ label: "Version", value: version }] : []),
+    ...(entry.bundle ? [{ label: "Size", value: kilobytes(entry.bundle.size) }] : []),
     ...(entry.license ? [{ label: "License", value: entry.license }] : []),
-    ...(marks.length
-      ? [
-          {
-            label: "Works with",
-            value: (
-              <>
-                {marks.slice(0, 3).map((engine) => (
-                  <Mark key={engine.id} of={`engine:${engine.id}`} label={engine.name} size={22} />
-                ))}
-              </>
-            ),
-            detail: marks.length === 1 ? "1 engine" : `${marks.length} engines`,
-          },
-        ]
-      : []),
+    ...(entry.source
+      ? [{ label: "Source", value: "GitHub" }]
+      : server?.homepage
+        ? [{ label: "Source", value: hostOf(server.homepage) }]
+        : []),
+    ...(entry.rank && entry.source ? [{ label: "Stars", value: rankText(entry.rank) }] : []),
   ];
-
   return (
-    <ProductPage
-      logo={<ListingLogo entry={entry} size="hero" />}
+    <StoreSheet
+      open
+      onOpenChange={(open) => !open && onClose()}
+      logo={<ListingLogo entry={entry} size="sheet" />}
       title={entry.name}
-      line={entry.description}
       maker={entry.maker}
-      onMaker={
-        entry.source
-          ? () => void openExternalLink(`https://github.com/${entry.source?.repo.split("/")[0]}`)
-          : undefined
-      }
-      action={<ActionButton action={action} size="md" />}
-      menu={
-        link ? (
-          <MenuItem
-            icon={ExternalLink}
-            label="Open its source"
-            onSelect={() => void openExternalLink(link)}
-          />
-        ) : undefined
-      }
-      onHeroOut={nav.setPinned}
+      action={<ActionButton action={action} size="md" label={entry.name} />}
+      menu={sourceLink(entry) ? <SourceMenu entry={entry} /> : undefined}
       facts={facts}
     >
-      <ProductSection title="About">
-        <Text as="p" size="body" wrap className="m-0 max-w-180">
-          {entry.description || `A ${kindNames[kind].one} by ${entry.maker}.`}
-        </Text>
-      </ProductSection>
-      {plugin?.includes ? (
-        <ProductSection title="What's inside">
-          <ProductTiles>
-            <ProductTile icon={ScrollText} value={plugin.includes.skills} label="Skills" />
-            <ProductTile icon={Users} value={plugin.includes.agents} label="Agents" />
-            <ProductTile icon={SquareSlash} value={plugin.includes.commands} label="Commands" />
-            <ProductTile
-              icon={Webhook}
-              value={plugin.includes.hooks ? "Yes" : "No"}
-              label="Hooks"
-            />
-            <ProductTile
-              icon={Cable}
-              value={plugin.includes.mcp ? "Yes" : "No"}
-              label="MCP server"
-            />
-          </ProductTiles>
-        </ProductSection>
+      <Text as="p" size="body" wrap className="m-0">
+        {entry.description || `A ${kindNames[kind].one} by ${entry.maker}.`}
+      </Text>
+      {inside.length ? (
+        <StoreSheetSection title="What's inside">
+          <CatalogNames names={inside} />
+        </StoreSheetSection>
+      ) : null}
+      {marks.length ? (
+        <StoreSheetSection title="Works with">
+          <div className="flex min-w-0 items-center gap-2">
+            {marks.map((engine) => (
+              <Mark key={engine.id} of={`engine:${engine.id}`} label={engine.name} size={27} />
+            ))}
+          </div>
+        </StoreSheetSection>
       ) : null}
       {server ? <McpConnects entry={server} /> : null}
-      <ProductSection title="Information">
-        <ProductInfo
+      <ListingHere item={item} />
+      <StoreSheetSection title="Information">
+        <StoreInfo
           items={[
             { label: "Made by", value: entry.maker },
             { label: "Category", value: category },
-            ...(entry.license ? [{ label: "License", value: entry.license }] : []),
             ...(entry.source ? [{ label: "Source", value: entry.source.repo }] : []),
             ...(entry.source && entry.source.path !== "."
               ? [{ label: "Folder", value: entry.source.path }]
@@ -194,62 +146,47 @@ function ListingProduct({ item }: { item: ListingItem }) {
             ...(server?.registry
               ? [{ label: "In the MCP registry", value: server.registry.name }]
               : []),
-            ...(entry.rank && entry.source
-              ? [{ label: "Stars", value: entry.rank.toLocaleString() }]
-              : []),
           ]}
         />
-      </ProductSection>
-      <ListingShelf
-        title={`More from ${entry.maker}`}
-        kind={kind}
-        items={more as EntryOf<typeof kind>[]}
-      />
-      <ListingShelf
-        title="You might also like"
-        kind={kind}
-        items={like as EntryOf<typeof kind>[]}
-      />
-    </ProductPage>
+      </StoreSheetSection>
+    </StoreSheet>
   );
 }
 
 function McpConnects({ entry }: { entry: McpEntry }) {
   return (
-    <ProductSection title="How it connects">
-      <SettingsSection>
-        {entry.remote ? (
-          <SettingsRow
-            label={`Hosted by ${entry.maker}`}
-            description={`You sign in to ${entry.maker} with your own account; nothing is installed`}
-          >
-            <Text size="meta" tone="muted">
-              {new URL(entry.remote.url).host}
-            </Text>
-          </SettingsRow>
-        ) : null}
-        {entry.package ? (
-          <SettingsRow
-            label="Runs on this computer"
-            description={`From the ${entry.package.type} package ${entry.package.identifier}`}
-          >
-            <Text size="meta" tone="muted">
-              {entry.package.version}
-            </Text>
-          </SettingsRow>
-        ) : null}
-        {(entry.env ?? []).map((one) => (
-          <SettingsRow
-            key={one.name}
-            label={one.name}
-            description={one.secret ? "A key it asks for once" : "Asked when you add it"}
-          >
-            <Text size="meta" tone="muted">
-              {one.required ? "Needed" : "Optional"}
-            </Text>
-          </SettingsRow>
-        ))}
-      </SettingsSection>
-    </ProductSection>
+    <SettingsSection title="How it connects">
+      {entry.remote ? (
+        <SettingsRow
+          label={`Hosted by ${entry.maker}`}
+          description={`You sign in to ${entry.maker} with your own account; nothing is installed`}
+        >
+          <Text size="meta" tone="muted">
+            {hostOf(entry.remote.url)}
+          </Text>
+        </SettingsRow>
+      ) : null}
+      {entry.package ? (
+        <SettingsRow
+          label="Runs on this computer"
+          description={`From the ${entry.package.type} package ${entry.package.identifier}`}
+        >
+          <Text size="meta" tone="muted">
+            {entry.package.version}
+          </Text>
+        </SettingsRow>
+      ) : null}
+      {(entry.env ?? []).map((one) => (
+        <SettingsRow
+          key={one.name}
+          label={one.name}
+          description={one.secret ? "A key it asks for once" : "Asked when you add it"}
+        >
+          <Text size="meta" tone="muted">
+            {one.required ? "Needed" : "Optional"}
+          </Text>
+        </SettingsRow>
+      ))}
+    </SettingsSection>
   );
 }

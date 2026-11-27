@@ -5,8 +5,9 @@ import { AGENT_META, agentOfRun, noteAppAgent } from "./app_agents";
 import { createAppMcpClient, McpRemoteError, McpUnreachable } from "./app_mcp_client";
 import { registerAppTools, serveAppTools, unregisterAppTools } from "./app_tool_server";
 import type { HostChannel } from "./host_channel";
+import { agentFiles } from "./app_screen_tools";
 import type { ToolDefinition } from "./app_screen_tools";
-import { ScreenRefused } from "./app_screen";
+import { ScreenRefused, useAppControl } from "./app_screen";
 import type { ScreenChannel } from "./app_screen";
 
 export const appToolName = (appId: string, tool: string) =>
@@ -22,6 +23,42 @@ const textOf = (content: unknown[] | undefined) =>
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+const PAGE_TOOL_LIMIT_MS = 120_000;
+const FILE_FORMAT = "misty-file";
+
+const schemaOf = (value: unknown) =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
+function fileFields(tool: ToolDefinition) {
+  const properties = schemaOf(schemaOf(tool.inputSchema)?.properties) ?? {};
+  const fields: { name: string; many: boolean }[] = [];
+  for (const [name, raw] of Object.entries(properties)) {
+    const property = schemaOf(raw);
+    if (property?.format === FILE_FORMAT) fields.push({ name, many: false });
+    else if (schemaOf(property?.items)?.format === FILE_FORMAT) fields.push({ name, many: true });
+  }
+  return fields;
+}
+
+async function withFiles(
+  tool: ToolDefinition,
+  input: Record<string, unknown>,
+  runId: string,
+): Promise<Record<string, unknown>> {
+  const fields = fileFields(tool);
+  if (!fields.length) return input;
+  const next = { ...input };
+  for (const { name, many } of fields) {
+    const value = input[name];
+    if (value === undefined || value === null) continue;
+    const files = await agentFiles(runId, many ? value : [value]);
+    next[name] = many ? files : files[0];
+  }
+  return next;
+}
+
 const maybeRan = (error: unknown) =>
   new Error(
     `${messageOf(error)} It may or may not have run in the app; check before doing it again.`,
@@ -31,7 +68,7 @@ export function offerAppTools(options: {
   appId: string;
   session: string;
   mcp: boolean;
-  adapter?: ScreenChannel;
+  page?: ScreenChannel;
   extra?: {
     definitions: ToolDefinition[];
     handlers(name: (tool: string) => string): Record<string, LocalToolHandler>;
@@ -43,6 +80,20 @@ export function offerAppTools(options: {
   let offering: Promise<void> = Promise.resolve();
   let onError: (error: Error) => void = () => {};
   const stopServing = serveAppTools();
+  const stopWatchingPage = options.page?.onTools(() => reoffer());
+  const pageCalls = new Map<string, { runId: string; agentId: string; name: string }>();
+  const stopPointing = options.page?.onPoint((spot) => {
+    const call = pageCalls.get(spot.call);
+    if (!call || !live) return;
+    useAppControl.getState().point(session, {
+      agentId: call.agentId,
+      name: call.name,
+      runId: call.runId,
+      x: spot.x,
+      y: spot.y,
+      doing: spot.doing,
+    });
+  });
   const client = createAppMcpClient((message) => channel?.sendMcp(message), {
     onToolsChanged: () => reoffer(),
   });
@@ -78,27 +129,47 @@ export function offerAppTools(options: {
         return { content: result.content ?? [], structuredContent: result.structuredContent };
       };
     }
-    const adapted = options.adapter
-      ? (
-          (await options.adapter.command<{ tools: ToolDefinition[] }>("adapter.tools")).tools ?? []
-        ).filter(
-          (tool) => typeof tool?.name === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(tool.name),
+    const page = options.page;
+    const fromMcp = new Set(tools.map((tool) => tool.name));
+    const adapted = page
+      ? ((await page.command<{ tools: ToolDefinition[] }>("tools.list")).tools ?? []).filter(
+          (tool) =>
+            typeof tool?.name === "string" &&
+            /^[A-Za-z0-9_.-]{1,64}$/.test(tool.name) &&
+            typeof tool.description === "string" &&
+            !fromMcp.has(tool.name),
         )
       : [];
     if (!live) return;
     for (const tool of adapted) {
-      handlers[appToolName(appId, tool.name)] = async ({ input, runId }) => {
+      handlers[appToolName(appId, tool.name)] = async ({ input, runId, callId, signal }) => {
         const agent = await callerOf(runId);
+        const args = await withFiles(tool, input, runId);
+        const cancel = () => {
+          void page!.command("tools.cancel", { call: callId }).catch(() => {});
+        };
+        signal.addEventListener("abort", cancel, { once: true });
+        pageCalls.set(callId, { runId, agentId: agent.id, name: agent.name });
         try {
-          return await options.adapter!.command("adapter.call", {
-            name: tool.name,
-            args: input,
-            agent,
-          });
+          return await page!.command(
+            "tools.call",
+            {
+              name: tool.name,
+              args,
+              agent,
+              call: callId,
+              quiet: tool.annotations?.readOnlyHint === true,
+              title: tool.title,
+            },
+            { timeoutMs: PAGE_TOOL_LIMIT_MS },
+          );
         } catch (error) {
           if (error instanceof ScreenRefused)
             throw new LocalToolRejected("app_tool_failed", messageOf(error));
           throw maybeRan(error);
+        } finally {
+          signal.removeEventListener("abort", cancel);
+          pageCalls.delete(callId);
         }
       };
     }
@@ -129,6 +200,9 @@ export function offerAppTools(options: {
     receive: (message: unknown) => client.receive(message),
     dispose() {
       live = false;
+      stopWatchingPage?.();
+      stopPointing?.();
+      pageCalls.clear();
       client.dispose();
       unregisterAppTools(session);
       stopServing();

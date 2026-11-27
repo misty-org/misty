@@ -2,6 +2,7 @@
 // See NOTICE.
 
 import { invoke } from "@/native/invoke";
+import { pickPaths } from "@/shared/lib/file_pick";
 
 export interface FontPreferences {
   fontFamily: string;
@@ -123,8 +124,13 @@ export const loadFontPreferences = () => invoke<FontPreferences>("engine_fonts_g
 export const saveFontPreferences = (preferences: FontPreferences) =>
   invoke<FontPreferences>("engine_fonts_set", { preferences });
 
-export const pickFontFile = (role: CustomFontRole) =>
-  invoke<string | null>("engine_fonts_pick", { role });
+export async function pickFontFile(role: CustomFontRole): Promise<string | null> {
+  const [path] = await pickPaths({
+    title: "Choose a font file",
+    accept: ".ttf,.otf,.ttc,.woff,.woff2",
+  });
+  return path ? invoke<string>("engine_fonts_pick", { role, path }) : null;
+}
 
 export async function applySavedFonts(): Promise<void> {
   const cached = readCache();

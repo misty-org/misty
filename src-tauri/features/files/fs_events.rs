@@ -2,7 +2,9 @@
 //! (item-level events, resumable from an event id), elsewhere `notify`'s own watcher. It follows
 //! every folder open in a window (`watch`) and the home folder while the search index runs
 //! (`search`), and hands each burst to both. When the set of followed places changes, the stream
-//! is made again from the last event it saw, so nothing in between is missed.
+//! is made again from the last event it saw, so nothing in between is missed. While the index runs,
+//! the stream leaves out the busy areas the index never reads (Misty's own data, most of
+//! `~/Library`, the Trash), unless a window shows a folder there.
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -33,7 +35,29 @@ struct Hub {
     index: Option<PathBuf>,
     resume: Option<u64>,
     watching: Vec<Root>,
+    quieted: Vec<PathBuf>,
     stream: Option<backend::Stream>,
+}
+
+const QUIET_LIMIT: usize = 8;
+
+fn quiet_areas(home: &Path) -> Vec<PathBuf> {
+    let library = home.join("Library");
+    let mut areas: Vec<PathBuf> = file_access::paths::misty_root_dir().into_iter().collect();
+    areas.extend(
+        [
+            "Caches",
+            "Application Support",
+            "Containers",
+            "Group Containers",
+            "Logs",
+            "Developer",
+        ]
+        .iter()
+        .map(|name| library.join(name)),
+    );
+    areas.push(home.join(".Trash"));
+    areas
 }
 
 static HUB: LazyLock<Mutex<Hub>> = LazyLock::new(Mutex::default);
@@ -78,9 +102,28 @@ impl Hub {
         minimal(folders.chain(index).collect())
     }
 
+    fn quiet(&self) -> Vec<PathBuf> {
+        let Some(home) = &self.index else {
+            return Vec::new();
+        };
+        quiet_areas(home)
+            .into_iter()
+            .filter(|area| area.starts_with(home) && area != home)
+            .filter(|area| {
+                !self
+                    .folders
+                    .keys()
+                    .any(|folder| folder.starts_with(area) || area.parent() == Some(folder.as_path()))
+            })
+            .take(QUIET_LIMIT)
+            .collect()
+    }
+
     fn refresh(&mut self) -> Result<(), String> {
         let wanted = self.wanted();
+        let quiet = self.quiet();
         if wanted == self.watching
+            && quiet == self.quieted
             && self.stream.is_some() != wanted.is_empty()
             && self.resume.is_none()
         {
@@ -88,12 +131,13 @@ impl Hub {
         }
         self.stream = None;
         self.watching = wanted.clone();
+        self.quieted = quiet.clone();
         if wanted.is_empty() {
             return Ok(());
         }
         let last = LAST.load(Ordering::SeqCst);
         let since = self.resume.take().or((last != 0).then_some(last));
-        self.stream = Some(backend::Stream::start(&wanted, since)?);
+        self.stream = Some(backend::Stream::start(&wanted, &quiet, since)?);
         Ok(())
     }
 }
@@ -155,7 +199,8 @@ mod backend {
         kFSEventStreamEventFlagUserDropped, kFSEventStreamEventIdSinceNow, ConstFSEventStreamRef,
         FSEventStreamContext, FSEventStreamCreate, FSEventStreamEventFlags, FSEventStreamEventId,
         FSEventStreamInvalidate, FSEventStreamRef, FSEventStreamRelease,
-        FSEventStreamSetDispatchQueue, FSEventStreamStart, FSEventStreamStop,
+        FSEventStreamSetDispatchQueue, FSEventStreamSetExclusionPaths, FSEventStreamStart,
+        FSEventStreamStop,
         FSEventsGetCurrentEventId,
     };
 
@@ -220,7 +265,11 @@ mod backend {
     unsafe impl Send for Stream {}
 
     impl Stream {
-        pub(super) fn start(roots: &[Root], since: Option<u64>) -> Result<Self, String> {
+        pub(super) fn start(
+            roots: &[Root],
+            quiet: &[PathBuf],
+            since: Option<u64>,
+        ) -> Result<Self, String> {
             let names: Vec<CFRetained<CFString>> = roots
                 .iter()
                 .map(|root| CFString::from_str(&root.path.to_string_lossy()))
@@ -251,6 +300,16 @@ mod backend {
             };
             if raw.is_null() {
                 return Err("Files couldn't follow changes on the disk.".into());
+            }
+            if !quiet.is_empty() {
+                let excluded: Vec<CFRetained<CFString>> = quiet
+                    .iter()
+                    .map(|path| CFString::from_str(&path.to_string_lossy()))
+                    .collect();
+                let excluded = CFArray::from_retained_objects(&excluded);
+                // SAFETY: raw is a stream just created and not yet started, and the array holds
+                // CFStrings of absolute paths, as FSEventStreamSetExclusionPaths expects.
+                unsafe { FSEventStreamSetExclusionPaths(raw, excluded.as_opaque()) };
             }
             let queue = DispatchQueue::new("com.misty.files.events", None);
             // SAFETY: raw is a stream just created and not yet started; the queue lives as long as
@@ -298,7 +357,11 @@ mod backend {
     }
 
     impl Stream {
-        pub(super) fn start(roots: &[Root], _since: Option<u64>) -> Result<Self, String> {
+        pub(super) fn start(
+            roots: &[Root],
+            _quiet: &[std::path::PathBuf],
+            _since: Option<u64>,
+        ) -> Result<Self, String> {
             let failed = |error: notify::Error| {
                 format!("Files couldn't follow changes on the disk: {error}")
             };
@@ -377,5 +440,23 @@ mod tests {
             kept,
             vec![root("/Volumes/Disk", false), root("/home/me", true)]
         );
+    }
+
+    #[test]
+    fn the_index_skips_quiet_areas_unless_a_window_shows_one() {
+        let mut hub = Hub {
+            index: Some(PathBuf::from("/home/me")),
+            ..Hub::default()
+        };
+        let caches = PathBuf::from("/home/me/Library/Caches");
+        assert!(hub.quiet().contains(&caches));
+        assert!(hub.quiet().len() <= QUIET_LIMIT);
+        hub.folders.insert(caches.join("app"), 1);
+        assert!(!hub.quiet().contains(&caches));
+        hub.folders.clear();
+        hub.folders.insert(PathBuf::from("/home/me/Library"), 1);
+        assert!(!hub.quiet().contains(&caches));
+        hub.index = None;
+        assert!(hub.quiet().is_empty());
     }
 }

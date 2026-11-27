@@ -1,5 +1,5 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import { memo, useMemo, type ReactNode } from "react";
+import { memo, useMemo } from "react";
 import { notify, Portal } from "@misty/ui";
 import { disk } from "@/features/files";
 import { useSpacesStore } from "../list/use_spaces_store";
@@ -8,7 +8,7 @@ import { canCreateIn, canPasteIn } from "./file_actions";
 import { canDropIn, draggedItems } from "./file_drag";
 import { FileInspector } from "./FileInspector";
 import { FilesListFooter } from "./FilesBottomBar";
-import { useFilesChoices } from "./files_choices";
+import { useFilesChoices, type FilesPickFooter } from "./files_choices";
 import type { SearchSuggest } from "./FilesSearch";
 import { FilesSidebar } from "./FilesSidebar";
 import { FilesActionBar, FilesNavBar, MoreRows, type FilesMoreMenu } from "./FilesToolbar";
@@ -305,11 +305,12 @@ export const PanePickFooter = memo(function PanePickFooter({
   footer,
 }: {
   shown: Map<string, FileItem>;
-  footer: (picked: FileItem[], open: (item: FileItem) => void) => ReactNode;
+  footer: FilesPickFooter;
 }) {
   const { actions } = usePane();
   const selectedItems = useSelectedItems(shown);
-  return <>{footer(selectedItems, actions.open)}</>;
+  const place = useBrowser((state) => state.place);
+  return <>{footer(selectedItems, actions.open, place)}</>;
 });
 
 export function PaneQuickLook() {

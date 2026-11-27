@@ -3,7 +3,7 @@ import type { Space } from "../../api/dto/entities";
 import { switchSpaceWindow } from "@/features/app-windows";
 import { DropdownMenuSeparator, MenuCheckItem, MenuItem, notify } from "@misty/ui";
 import { driveNative } from "../../drive/drive_native";
-import { muteWithNotice, setMuted, useMessageNotices } from "@/shared/lib/message_notices";
+import { setMutedWithNotice, useMessageNotices } from "@/shared/lib/message_notices";
 import {
   canManageSpaceLifecycle,
   preferredDefaultSpace,
@@ -118,11 +118,7 @@ export function SpaceSettingsItems(props: {
         icon={<BellOff />}
         label="Mute notifications"
         checked={muted}
-        onSelect={() =>
-          muted
-            ? setMuted(space.id, false)
-            : muteWithNotice(space.id, "Notifications off for this Space")
-        }
+        onSelect={() => setMutedWithNotice(space.id, !muted, "this Space")}
       />
       {canLeave ? (
         <>

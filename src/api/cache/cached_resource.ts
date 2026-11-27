@@ -10,6 +10,7 @@ interface Entry {
   value?: unknown;
   hasValue: boolean;
   fetchedAt?: number;
+  loadedAt?: number;
   error?: unknown;
   running?: Promise<unknown>;
   restored: boolean;
@@ -73,6 +74,28 @@ async function restore(key: string, persist: CachePersistence) {
   } catch {}
 }
 
+const freshForMs = 30_000;
+
+function fresh(key: string): boolean {
+  const current = entries.get(key);
+  return Boolean(
+    current?.hasValue &&
+    !current.running &&
+    current.loadedAt &&
+    Date.now() - current.loadedAt < freshForMs,
+  );
+}
+
+function sameValue(previous: unknown, next: unknown): boolean {
+  if (previous === next) return true;
+  if (!previous || !next || typeof previous !== "object" || typeof next !== "object") return false;
+  try {
+    return JSON.stringify(previous) === JSON.stringify(next);
+  } catch {
+    return false;
+  }
+}
+
 function load<T>(
   key: string,
   loader: () => Promise<T>,
@@ -87,16 +110,20 @@ function load<T>(
   const running = loader().then(
     (value) => {
       if (!newest()) return value;
-      Object.assign(entry(key), {
-        value,
+      const before = entry(key);
+      const kept = before.hasValue && sameValue(before.value, value) ? (before.value as T) : value;
+      Object.assign(before, {
+        value: kept,
         hasValue: true,
         fetchedAt: Date.now(),
+        loadedAt: Date.now(),
         error: undefined,
         running: undefined,
       });
       changed(key);
-      if (scope) void writeApiCache(scope, savedKey(key), JSON.stringify(value ?? null));
-      return value;
+      if (scope && kept === value)
+        void writeApiCache(scope, savedKey(key), JSON.stringify(value ?? null));
+      return kept;
     },
     (error: unknown) => {
       if (newest()) {
@@ -205,7 +232,7 @@ export function useCachedResource<T>(
   useEffect(() => {
     if (!key) return;
     void restore(key, persist);
-    load(key, () => latestLoader.current(), persist, true).catch(() => {});
+    if (!fresh(key)) load(key, () => latestLoader.current(), persist, true).catch(() => {});
     const watched = watchedLoaders.get(key);
     const run = () => latestLoader.current();
     watchedLoaders.set(key, { loader: run, persist, watchers: (watched?.watchers ?? 0) + 1 });

@@ -127,7 +127,7 @@ describe("useCliVersionStatus session store", () => {
     expect(latest.loading).toBe(true);
   });
 
-  it("repaints the cached status at once on remount and refreshes behind it", async () => {
+  it("repaints the cached status at once on a later remount and refreshes behind it", async () => {
     mocks.status.mockResolvedValue(versionStatus("claude"));
     await render("claude");
     expect(latest.status?.localVersion).toBe("2.1.228 (Claude Code)");
@@ -136,6 +136,8 @@ describe("useCliVersionStatus session store", () => {
     await act(async () => firstRoot.unmount());
     root = null;
 
+    const later = Date.now() + 60_000;
+    const clock = vi.spyOn(Date, "now").mockReturnValue(later);
     const secondProbe = deferred<CliVersionStatus>();
     mocks.status.mockReturnValue(secondProbe.promise);
     await render("claude");
@@ -148,6 +150,7 @@ describe("useCliVersionStatus session store", () => {
     });
     expect(latest.status?.localVersion).toBe("2.1.229 (Claude Code)");
     expect(latest.loading).toBe(false);
+    clock.mockRestore();
   });
 
   it("an update runs the installer and then probes again", async () => {

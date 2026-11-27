@@ -7,7 +7,6 @@ import {
   Compass,
   LayoutGrid,
   ScrollText,
-  Settings2,
   UserRound,
   Users,
   type LucideIcon,
@@ -25,32 +24,26 @@ import {
   NavList,
   NavRow,
   OverflowFadeText,
-  ProductBar,
-  RowGroupStack,
   SearchField,
   Separator,
-  SidePanel,
   Text,
   ToolbarDivider,
   type CollectionFilterGroup,
 } from "@misty/ui";
 import type { ListingKind } from "@/native/registry";
 import { AllPage, KindPage, SearchPage } from "./ExploreKinds";
-import { ExploreManage } from "./ExploreManage";
-import { ExploreProduct } from "./ExploreProducts";
+import { ExploreSheet } from "./ExploreProducts";
 import { AppsPage } from "./ExploreApps";
 import { EnginesPage } from "./ExploreEngines";
 import { SpeechPage } from "./ExploreSpeech";
-import { MyAppsPage } from "./ExploreUpdates";
-import { useMyAppsCount } from "./explore_updates";
+import { InstalledPage } from "./ExploreUpdates";
+import { useInstalledCount } from "./explore_updates";
 import { ListingList } from "./ListingList";
-import { ActionButton } from "./ListingRows";
 import { kindNames, useCategories, useListing, type ExploreSort } from "./explore_index";
 import {
   ExploreNavContext,
   itemKey,
   pageOf,
-  type BarAction,
   type ExploreItem,
   type ExploreNav,
   type ExplorePage as Page,
@@ -101,6 +94,10 @@ const facets: Partial<
 };
 
 const listingPages = new Set<string>(["templates", "skills", "plugins", "mcps"]);
+const searchPages = new Set<string>(["all", "apps", ...listingPages]);
+
+const listingOf = (page: Page): ListingKind | null =>
+  listingPages.has(page) ? (page as ListingKind) : null;
 
 interface Held {
   view: ExploreView;
@@ -128,14 +125,17 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
   const [stack, setStack] = useState<Stack>(() => ({
     page,
     query: "",
-    held: linkedApp
-      ? [{ view: { at: "item", item: { kind: "apps", id: linkedApp } }, top: 0 }]
-      : [],
+    held: [],
     baseTop: 0,
   }));
-  const searching = query.trim() !== "";
+  const [sheet, setSheet] = useState<ExploreItem | null>(() =>
+    linkedApp ? { kind: "apps", id: linkedApp } : null,
+  );
+  const searching = query.trim() !== "" && searchPages.has(page);
   if (stack.page !== page || stack.query !== query) setStack({ page, query, held: [], baseTop: 0 });
-  const base: ExploreView = searching ? { at: "search", query } : { at: "page", page };
+  const base: ExploreView = searching
+    ? { at: "search", query, within: page }
+    : { at: "page", page };
   const view =
     stack.page === page && stack.query === query ? (stack.held.at(-1)?.view ?? base) : base;
 
@@ -143,23 +143,19 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
   const [category, setCategory] = useState("all");
   const [facet, setFacet] = useState("all");
   const [layout, setLayout] = useState<"list" | "grid">("list");
-  const [pinned, setPinned] = useState(false);
-  const [bar, setBar] = useState<(Omit<BarAction, "onClick"> & { run: () => void }) | null>(null);
-  const [barTitle, setBarTitle] = useState("");
-  const [managing, setManaging] = useState<ExploreItem | null>(null);
   const scroller = useRef<HTMLElement>(null);
   const restore = useRef<number | null>(null);
-  const mine = useMyAppsCount(spaceId);
+  const installed = useInstalledCount(spaceId);
 
   const goTab = useCallback(
     (next: Page) => {
       const params = new URLSearchParams(location.search);
       params.set("tab", next);
+      params.delete("app");
       setQuery("");
       setCategory("all");
       setFacet("all");
       setStack({ page: next, query: "", held: [], baseTop: 0 });
-      setManaging(null);
       restore.current = 0;
       navigate(`${location.pathname}?${params}`, { replace: true });
     },
@@ -169,7 +165,6 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
   const nav = useMemo<ExploreNav>(() => {
     const push = (next: ExploreView) => {
       const top = scroller.current?.scrollTop ?? 0;
-      setPinned(false);
       setStack((current) => {
         const held = [...current.held];
         const last = held.at(-1);
@@ -187,26 +182,19 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
         if (next.at === "page") goTab(next.page);
         else push(next);
       },
-      open: (item: ExploreItem) => push({ at: "item", item }),
-      manage: (item: ExploreItem) => setManaging(item),
-      closeManage: () => setManaging(null),
+      open: (item: ExploreItem) => setSheet(item),
+      close: () => setSheet(null),
       back: () => {
-        setPinned(false);
         setStack((current) => {
           const held = current.held.slice(0, -1);
           restore.current = held.at(-1)?.top ?? current.baseTop;
           return { ...current, held };
         });
       },
-      setPinned,
-      setBarAction: (action, onClick, title) => {
-        setBar(action && onClick ? { ...action, run: onClick } : null);
-        if (title !== undefined) setBarTitle(title);
-      },
     };
   }, [goTab]);
 
-  const viewKey = view.at === "item" ? itemKey(view.item) : JSON.stringify(view);
+  const viewKey = JSON.stringify(view);
   useLayoutEffect(() => {
     if (restore.current === null || !scroller.current) return;
     scroller.current.scrollTop = restore.current;
@@ -218,16 +206,9 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
       aria-label="Explore"
       className="grid size-full content-start gap-3 overflow-y-auto px-3 py-4"
     >
-      <SearchField
-        aria-label="Search Explore"
-        placeholder="Search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        onClear={() => setQuery("")}
-      />
       <NavList>
         {rail.map(({ value, label, icon: Icon }) => (
-          <NavRow key={value} current={!searching && page === value} onClick={() => goTab(value)}>
+          <NavRow key={value} current={page === value} onClick={() => goTab(value)}>
             <Icon />
             <OverflowFadeText>{label}</OverflowFadeText>
           </NavRow>
@@ -235,12 +216,12 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
       </NavList>
       <Separator />
       <NavList>
-        <NavRow current={!searching && page === "mine"} onClick={() => goTab("mine")}>
+        <NavRow current={page === "mine"} onClick={() => goTab("mine")}>
           <CircleArrowDown />
-          <OverflowFadeText>My apps</OverflowFadeText>
-          {mine ? (
+          <OverflowFadeText>Installed</OverflowFadeText>
+          {installed ? (
             <Text size="caption" tone="muted" className="ml-auto tabular-nums">
-              {mine}
+              {installed}
             </Text>
           ) : null}
         </NavRow>
@@ -248,16 +229,12 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
     </nav>
   );
 
-  const barButton = bar ? (
-    <ActionButton action={{ ...bar, onClick: bar.run }} size="md" label={barTitle} />
-  ) : null;
-
   const header = (
     <ExploreBar
       view={view}
-      title={barTitle}
-      pinned={pinned}
-      action={barButton}
+      page={page}
+      query={query}
+      onQuery={setQuery}
       sort={sort}
       onSort={setSort}
       category={category}
@@ -271,9 +248,7 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
   );
 
   let body: ReactNode;
-  if (view.at === "item")
-    body = <ExploreProduct key={viewKey} item={view.item} spaceId={spaceId} />;
-  else if (view.at === "list")
+  if (view.at === "list")
     body = (
       <ListingList
         key={viewKey}
@@ -286,12 +261,19 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
       />
     );
   else if (view.at === "search")
-    body = <SearchPage query={view.query} sort={sort} spaceId={spaceId} />;
+    body = (
+      <SearchPage
+        query={view.query}
+        sort={sort}
+        spaceId={spaceId}
+        within={view.within === "apps" ? "apps" : (listingOf(view.within) ?? undefined)}
+      />
+    );
   else if (view.page === "all") body = <AllPage spaceId={spaceId} />;
   else if (view.page === "apps") body = <AppsPage spaceId={spaceId} />;
   else if (view.page === "engines") body = <EnginesPage />;
-  else if (view.page === "speech") body = <SpeechPage />;
-  else if (view.page === "mine") body = <MyAppsPage spaceId={spaceId} />;
+  else if (view.page === "speech") body = <SpeechPage spaceId={spaceId} />;
+  else if (view.page === "mine") body = <InstalledPage spaceId={spaceId} />;
   else body = <KindPage kind={view.page} sort={sort} category={category} facet={facet} />;
 
   const flush = view.at === "list" && layout === "list";
@@ -300,31 +282,6 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
       <FramedPage
         autoSaveId="explore"
         header={header}
-        end={
-          managing
-            ? {
-                id: "explore-manage",
-                label: "Resize Manage",
-                width: 360,
-                minWidth: 288,
-                maxWidth: 540,
-                content: (
-                  <SidePanel
-                    label="Manage"
-                    name="Manage"
-                    icon={Settings2}
-                    onClose={() => setManaging(null)}
-                  >
-                    <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-4 pb-8">
-                      <RowGroupStack>
-                        <ExploreManage key={itemKey(managing)} item={managing} spaceId={spaceId} />
-                      </RowGroupStack>
-                    </div>
-                  </SidePanel>
-                ),
-              }
-            : null
-        }
         start={{
           id: "explore-rail",
           label: "Resize the rail",
@@ -339,21 +296,29 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
           {flush ? (
             body
           ) : (
-            <div className="mx-auto grid w-full max-w-6xl content-start gap-10 px-9 pt-6 pb-16">
+            <div className="mx-auto grid w-full max-w-6xl content-start gap-9 px-9 pt-6 pb-16">
               {body}
             </div>
           )}
         </main>
       </FramedPage>
+      {sheet ? (
+        <ExploreSheet
+          key={itemKey(sheet)}
+          item={sheet}
+          spaceId={spaceId}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
     </ExploreNavContext.Provider>
   );
 }
 
 function ExploreBar({
   view,
-  title,
-  pinned,
-  action,
+  page,
+  query,
+  onQuery,
   sort,
   onSort,
   category,
@@ -365,9 +330,9 @@ function ExploreBar({
   onBack,
 }: {
   view: ExploreView;
-  title: string;
-  pinned: boolean;
-  action: ReactNode;
+  page: Page;
+  query: string;
+  onQuery: (query: string) => void;
   sort: ExploreSort;
   onSort: (sort: ExploreSort) => void;
   category: string;
@@ -379,16 +344,8 @@ function ExploreBar({
   onBack: () => void;
 }) {
   const categories = useCategories();
-  const kind: ListingKind | null =
-    view.at === "list"
-      ? view.kind
-      : view.at === "page" && listingPages.has(view.page)
-        ? (view.page as ListingKind)
-        : null;
+  const kind: ListingKind | null = view.at === "list" ? view.kind : listingOf(page);
   const listing = useListing(kind ?? "skills");
-  const back = <BackButton onClick={onBack} />;
-  if (view.at === "item")
-    return <ProductBar back={back} title={title} action={action} pinned={pinned} />;
   const sortMenu = (
     <CollectionSortMenu
       value={sort}
@@ -398,7 +355,7 @@ function ExploreBar({
   );
   const groups: CollectionFilterGroup[] = [];
   const facetGroup = kind ? facets[kind] : undefined;
-  if (facetGroup)
+  if (facetGroup && view.at !== "search")
     groups.push({
       label: facetGroup.label,
       value: facet,
@@ -437,7 +394,7 @@ function ExploreBar({
       <FramedBar
         start={
           <>
-            {back}
+            <BackButton onClick={onBack} />
             <Text size="control" tone="bright" weight="semibold">
               {name}
             </Text>
@@ -456,19 +413,41 @@ function ExploreBar({
       </FramedBar>
     );
   }
-  if (kind && listing)
-    return (
-      <FramedBar
-        start={
-          <Text size="meta" tone="muted">
-            {`${listing.count.toLocaleString()} ${kindNames[kind].counted}`}
-          </Text>
-        }
-      >
-        {filter}
-        {sortMenu}
-      </FramedBar>
-    );
-  if (view.at === "search") return <FramedBar>{sortMenu}</FramedBar>;
-  return <FramedBar>{action}</FramedBar>;
+  if (!searchPages.has(page)) return <FramedBar />;
+  const placeholder =
+    page === "all"
+      ? "Search apps, templates, skills and plugins"
+      : page === "apps"
+        ? "Search apps"
+        : kind && listing
+          ? `Search ${listing.count.toLocaleString()} ${kindNames[kind].counted}`
+          : `Search ${kind ? kindNames[kind].counted : ""}`;
+  return (
+    <FramedBar
+      start={
+        <SearchField
+          aria-label={
+            page === "all"
+              ? "Search Explore"
+              : `Search ${page === "apps" ? "apps" : kind ? kindNames[kind].counted : ""}`
+          }
+          placeholder={placeholder}
+          value={query}
+          onChange={(event) => onQuery(event.target.value)}
+          onClear={() => onQuery("")}
+        />
+      }
+    >
+      {view.at === "search" ? (
+        page === "apps" ? null : (
+          sortMenu
+        )
+      ) : kind ? (
+        <>
+          {filter}
+          {sortMenu}
+        </>
+      ) : null}
+    </FramedBar>
+  );
 }

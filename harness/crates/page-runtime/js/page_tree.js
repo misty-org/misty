@@ -32,16 +32,23 @@
   const states = (el, role, node) => {
     const aria = (name) => el.getAttribute(name);
     const props = node.props;
-    if (role === "heading") props.push(`level=${aria("aria-level") || el.tagName.slice(1) || 2}`);
+    const pw = (read, fallback) => {
+      if (!P.aria) return fallback();
+      try { return read(P.aria); } catch { return fallback(); }
+    };
+    if (role === "heading") props.push(`level=${pw((a) => a.level(el), () => Number(aria("aria-level") || el.tagName.slice(1) || 2))}`);
     if (["checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"].includes(role)) {
-      const checked = el.tagName === "INPUT" ? (el.indeterminate ? "mixed" : String(el.checked)) : aria("aria-checked");
+      const checked = pw((a) => String(a.checked(el)), () => el.tagName === "INPUT" ? (el.indeterminate ? "mixed" : String(el.checked)) : aria("aria-checked"));
       props.push(checked === "true" ? "checked" : checked === "mixed" ? "mixed" : "unchecked");
     }
-    if (aria("aria-pressed") === "true") props.push("pressed");
-    if (aria("aria-expanded")) props.push(aria("aria-expanded") === "true" ? "expanded" : "collapsed");
-    if (aria("aria-selected") === "true" || (el.tagName === "OPTION" && el.selected)) props.push("selected");
+    const pressed = pw((a) => a.pressed(el), () => aria("aria-pressed") === "true");
+    if (pressed === true) props.push("pressed");
+    if (pressed === "mixed") props.push("pressed=mixed");
+    const expanded = pw((a) => a.expanded(el), () => aria("aria-expanded") ? aria("aria-expanded") === "true" : undefined);
+    if (expanded !== undefined) props.push(expanded ? "expanded" : "collapsed");
+    if (pw((a) => a.selected(el), () => aria("aria-selected") === "true") || (el.tagName === "OPTION" && el.selected)) props.push("selected");
     if (aria("aria-current") && aria("aria-current") !== "false") props.push("current");
-    if (el.disabled || aria("aria-disabled") === "true") props.push("disabled");
+    if (pw((a) => a.disabled(el), () => el.disabled || aria("aria-disabled") === "true")) props.push("disabled");
     if (el.required || aria("aria-required") === "true") props.push("required");
     if (aria("aria-invalid") === "true" || (el.validity && el.willValidate && !el.validity.valid && el.value)) props.push("invalid");
     if (el.readOnly || aria("aria-readonly") === "true") props.push("readonly");
@@ -131,8 +138,19 @@
     return !style.display.startsWith("inline") && scrollRoom(el, style) !== null;
   };
 
+  const DROP_ROLES = new Set(["region", "group", "listitem", "row", "cell", "article", "tabpanel", "form", "dialog", "figure", "list", "complementary"]);
+
   /** Builds the visible accessibility tree under root, registering refs. */
   P.build = (root, limits = {}) => {
+    P.aria?.begin?.();
+    try {
+      return buildTree(root, limits);
+    } finally {
+      P.aria?.end?.();
+    }
+  };
+
+  const buildTree = (root, limits = {}) => {
     const maxRefs = limits.maxRefs ?? 800;
     const tree = { role: "root", children: [], props: [] };
     let scanned = 0;
@@ -214,10 +232,13 @@
           el.hasAttribute("onclick") || el.hasAttribute("onmousedown") || el.hasAttribute("onmouseup");
         if (clickable) role = "clickable";
       }
+      const draggable = !invisible && el.getAttribute("draggable") === "true";
+      if (draggable && !role) role = "clickable";
       const scroll = block && el !== el.ownerDocument.body && el !== el.ownerDocument.documentElement
         ? scrollRoom(el, style) : null;
       const scrollable = Boolean(scroll);
-      const acts = !invisible && (P.interactiveRoles.has(role) || clickable);
+      const named = DROP_ROLES.has(role) && !invisible && P.name(el, role) !== "";
+      const acts = !invisible && (P.interactiveRoles.has(role) || clickable || draggable || named);
       if (!acts && !scrollable && !STRUCTURE.has(role)) {
         visitChildren(el, parent, invisible);
         if (block) close(parent);
@@ -229,6 +250,7 @@
         else if (refs < maxRefs) { node.ref = P.register(el); refs++; }
       }
       if (scroll) node.props.push(scroll.text ? `scrollable: ${scroll.text}` : "scrollable");
+      if (draggable) node.props.push("draggable");
       if (role) states(el, role, node);
       if (!secret) {
         const value = valueOf(el, role);
